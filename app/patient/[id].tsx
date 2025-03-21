@@ -656,8 +656,8 @@ const styles = StyleSheet.create({
   },
   appBarTitle: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: 'normal',
+    fontSize: 18,
+    fontWeight: '500',
   },
   profileCard: {
     marginTop: 16,
