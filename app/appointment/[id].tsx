@@ -1,6 +1,6 @@
 import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -183,51 +183,45 @@ export default function AppointmentDetailsScreen() {
           titleStyle={styles.appBarTitle}
         />
         
-        {/* Status change menu */}
-        <Menu
-          visible={statusMenuVisible}
-          onDismiss={() => setStatusMenuVisible(false)}
-          anchor={
-            <IconButton 
-              icon="dots-vertical" 
-              iconColor="white" 
-              onPress={() => setStatusMenuVisible(true)}
-            />
-          }
-          contentStyle={styles.statusMenuContent}
-        >
-          {shouldShowStatusAction('confirmed') && (
-            <Menu.Item 
-              onPress={() => openStatusChangeDialog('confirmed')} 
-              title="Mark as Confirmed" 
-              leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-            />
-          )}
-          
-          {shouldShowStatusAction('completed') && (
-            <Menu.Item 
-              onPress={() => setMedicalRecordDialogVisible(true)} 
-              title="Complete with Medical Record" 
-              leadingIcon={props => <FontAwesome5 name="notes-medical" size={16} color="#00897B" {...props} />}
-            />
-          )}
-          
-          {shouldShowStatusAction('cancelled') && (
-            <Menu.Item 
-              onPress={() => openStatusChangeDialog('cancelled')} 
-              title="Cancel Appointment" 
-              leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
-            />
-          )}
-          
-          {appointment.status === 'cancelled' && shouldShowStatusAction('pending') && (
-            <Menu.Item 
-              onPress={() => openStatusChangeDialog('pending')} 
-              title="Restore to Pending" 
-              leadingIcon={props => <FontAwesome5 name="redo" size={16} color="#FF9800" {...props} />}
-            />
-          )}
-        </Menu>
+        {/* Status change menu - only show for pending or confirmed appointments */}
+        {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+          <Menu
+            visible={statusMenuVisible}
+            onDismiss={() => setStatusMenuVisible(false)}
+            anchor={
+              <IconButton 
+                icon="dots-vertical" 
+                iconColor="white" 
+                onPress={() => setStatusMenuVisible(true)}
+              />
+            }
+            contentStyle={styles.statusMenuContent}
+          >
+            {appointment.status === 'pending' && (
+              <Menu.Item 
+                onPress={() => openStatusChangeDialog('confirmed')} 
+                title="Confirm Appointment" 
+                leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
+              />
+            )}
+            
+            {appointment.status === 'confirmed' && (
+              <Menu.Item 
+                onPress={() => setMedicalRecordDialogVisible(true)} 
+                title="Complete with Medical Record" 
+                leadingIcon={props => <FontAwesome5 name="notes-medical" size={16} color="#00897B" {...props} />}
+              />
+            )}
+            
+            {appointment.status === 'pending' && (
+              <Menu.Item 
+                onPress={() => openStatusChangeDialog('cancelled')} 
+                title="Cancel Appointment" 
+                leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
+              />
+            )}
+          </Menu>
+        )}
       </Appbar.Header>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -329,6 +323,135 @@ export default function AppointmentDetailsScreen() {
           </View>
         </Surface>
         
+        {/* Medical Record Card - only show for completed appointments */}
+        {appointment.status === 'completed' && appointment.notes && (
+          <Surface style={styles.card} elevation={1}>
+            <View style={styles.cardHeader}>
+              <FontAwesome5 name="notes-medical" size={18} color="#00897B" style={styles.cardHeaderIcon} />
+              <ThemedText style={styles.cardHeaderTitle}>Medical Record</ThemedText>
+            </View>
+            
+            <Divider style={styles.divider} />
+            
+            <View style={styles.medicalInfoContainer}>
+              {appointment.notes.includes('Diagnosis:') ? (
+                <>
+                  {appointment.notes.match(/Diagnosis:\s*([^\n]+)/) && (
+                    <View style={styles.medicalInfoRow}>
+                      <ThemedText style={styles.medicalInfoLabel}>Diagnosis:</ThemedText>
+                      <ThemedText style={styles.medicalInfoValue}>
+                        {appointment.notes.match(/Diagnosis:\s*([^\n]+)/)[1]}
+                      </ThemedText>
+                    </View>
+                  )}
+                  
+                  {appointment.notes.match(/Blood Pressure:\s*([^\n]+)/) && (
+                    <View style={styles.medicalInfoRow}>
+                      <ThemedText style={styles.medicalInfoLabel}>Blood Pressure:</ThemedText>
+                      <ThemedText style={styles.medicalInfoValue}>
+                        {appointment.notes.match(/Blood Pressure:\s*([^\n]+)/)[1]}
+                      </ThemedText>
+                    </View>
+                  )}
+                  
+                  {appointment.notes.match(/Weight:\s*([^\n]+)/) && (
+                    <View style={styles.medicalInfoRow}>
+                      <ThemedText style={styles.medicalInfoLabel}>Weight:</ThemedText>
+                      <ThemedText style={styles.medicalInfoValue}>
+                        {appointment.notes.match(/Weight:\s*([^\n]+)/)[1]}
+                      </ThemedText>
+                    </View>
+                  )}
+                  
+                  {appointment.notes.match(/Prescription:\s*([^\n]+)/) && (
+                    <View style={styles.medicalInfoRow}>
+                      <ThemedText style={styles.medicalInfoLabel}>Prescription:</ThemedText>
+                      <ThemedText style={styles.medicalInfoValue}>
+                        {appointment.notes.match(/Prescription:\s*([^\n]+)/)[1]}
+                      </ThemedText>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.medicalInfoRow}>
+                  <ThemedText style={styles.medicalInfoValue}>{appointment.notes}</ThemedText>
+                </View>
+              )}
+            </View>
+          </Surface>
+        )}
+        
+        {/* Medical Record Form for confirmed appointments */}
+        {appointment.status === 'confirmed' && (
+          <Surface style={styles.card} elevation={1}>
+            <View style={styles.cardHeader}>
+              <FontAwesome5 name="notes-medical" size={18} color="#00897B" style={styles.cardHeaderIcon} />
+              <ThemedText style={styles.cardHeaderTitle}>Add Medical Record</ThemedText>
+            </View>
+            
+            <Divider style={styles.divider} />
+            
+            <View style={styles.medicalRecordFormContainer}>
+              <TextInput
+                label="Diagnosis/Remarks"
+                value={remarks}
+                onChangeText={setRemarks}
+                mode="outlined"
+                style={styles.input}
+                multiline
+                numberOfLines={2}
+                outlineColor="#E0E0E0"
+                activeOutlineColor="#4CAF50"
+              />
+              
+              <TextInput
+                label="Blood Pressure"
+                value={bloodPressure}
+                onChangeText={setBloodPressure}
+                mode="outlined"
+                style={styles.input}
+                outlineColor="#E0E0E0"
+                activeOutlineColor="#4CAF50"
+                placeholder="e.g. 120/80"
+              />
+              
+              <TextInput
+                label="Weight"
+                value={weight}
+                onChangeText={setWeight}
+                mode="outlined"
+                style={styles.input}
+                outlineColor="#E0E0E0"
+                activeOutlineColor="#4CAF50"
+                placeholder="e.g. 70 kg"
+              />
+              
+              <TextInput
+                label="Prescription"
+                value={prescription}
+                onChangeText={setPrescription}
+                mode="outlined"
+                style={styles.input}
+                multiline
+                numberOfLines={3}
+                outlineColor="#E0E0E0"
+                activeOutlineColor="#4CAF50"
+              />
+              
+              <Button 
+                mode="contained"
+                icon={() => <FontAwesome5 name="check-circle" size={16} color="#FFFFFF" />}
+                style={styles.completeButton}
+                buttonColor="#4CAF50"
+                textColor="#FFFFFF"
+                onPress={handleCompletionWithMedicalRecord}
+              >
+                Complete Appointment
+              </Button>
+            </View>
+          </Surface>
+        )}
+        
         {/* Action buttons at the bottom */}
         <Surface style={styles.bottomActions} elevation={1}>
           <Button 
@@ -341,101 +464,31 @@ export default function AppointmentDetailsScreen() {
             Back
           </Button>
           
-          {appointment.status === 'confirmed' || appointment.status === 'pending' ? (
-            <Button 
-              mode="contained"
-              icon={() => <FontAwesome5 name="notes-medical" size={16} color="#FFFFFF" />}
-              style={styles.completeButton}
-              buttonColor="#4CAF50"
-              textColor="#FFFFFF"
-              onPress={() => setMedicalRecordDialogVisible(true)}
-            >
-              Complete & Add Medical Record
-            </Button>
-          ) : null}
+          {appointment.status === 'pending' && (
+            <View style={styles.buttonGroup}>
+              <Button 
+                mode="outlined"
+                icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
+                style={styles.cancelAppointmentButton}
+                textColor="#F44336"
+                onPress={() => openStatusChangeDialog('cancelled')}
+              >
+                Cancel
+              </Button>
+              <Button 
+                mode="contained"
+                icon={() => <FontAwesome5 name="check" size={16} color="#FFFFFF" />}
+                style={styles.confirmButton}
+                buttonColor="#4CAF50"
+                textColor="#FFFFFF"
+                onPress={() => openStatusChangeDialog('confirmed')}
+              >
+                Confirm
+              </Button>
+            </View>
+          )}
         </Surface>
       </ScrollView>
-      
-      {/* Medical Record Dialog */}
-      <Dialog 
-        visible={medicalRecordDialogVisible} 
-        onDismiss={() => setMedicalRecordDialogVisible(false)}
-        style={styles.dialog}
-      >
-        <Dialog.Title style={styles.dialogTitle}>
-          <FontAwesome5 name="notes-medical" size={16} color="#4CAF50" style={{marginRight: 6}} />
-          Complete Appointment
-        </Dialog.Title>
-        
-        <Dialog.Content>
-          <ThemedText style={styles.dialogText}>
-            Complete this appointment and add medical record for {patient.name}:
-          </ThemedText>
-          
-          <TextInput
-            label="Diagnosis/Remarks"
-            value={remarks}
-            onChangeText={setRemarks}
-            mode="outlined"
-            style={styles.input}
-            multiline
-            numberOfLines={2}
-            outlineColor="#E0E0E0"
-            activeOutlineColor="#4CAF50"
-          />
-          
-          <TextInput
-            label="Blood Pressure"
-            value={bloodPressure}
-            onChangeText={setBloodPressure}
-            mode="outlined"
-            style={styles.input}
-            outlineColor="#E0E0E0"
-            activeOutlineColor="#4CAF50"
-            placeholder="e.g. 120/80"
-          />
-          
-          <TextInput
-            label="Weight"
-            value={weight}
-            onChangeText={setWeight}
-            mode="outlined"
-            style={styles.input}
-            outlineColor="#E0E0E0"
-            activeOutlineColor="#4CAF50"
-            placeholder="e.g. 70 kg"
-          />
-          
-          <TextInput
-            label="Prescription"
-            value={prescription}
-            onChangeText={setPrescription}
-            mode="outlined"
-            style={styles.input}
-            multiline
-            numberOfLines={3}
-            outlineColor="#E0E0E0"
-            activeOutlineColor="#4CAF50"
-          />
-        </Dialog.Content>
-        
-        <Dialog.Actions style={styles.dialogActions}>
-          <Button 
-            onPress={() => setMedicalRecordDialogVisible(false)} 
-            textColor="#757575"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onPress={handleCompletionWithMedicalRecord}
-            mode="contained"
-            buttonColor="#4CAF50"
-            style={{borderRadius: 8}}
-          >
-            Complete Appointment
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
       
       {/* Status Change Dialog */}
       <Dialog 
@@ -692,5 +745,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     elevation: 4,
+  },
+  medicalRecordFormContainer: {
+    padding: 16,
+  },
+  buttonGroup: {
+    flex: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelAppointmentButton: {
+    flex: 1,
+    marginRight: 8,
+    borderColor: '#F44336',
+    borderRadius: 8,
+  },
+  confirmButton: {
+    flex: 1,
+    borderRadius: 8,
   },
 }); 
