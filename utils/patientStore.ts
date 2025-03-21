@@ -162,19 +162,19 @@ export const addPatient = (patientData: PatientFormData): Patient => {
 };
 
 // Get patient by ID
-export const getPatientById = (id: string): Patient | undefined => {
-  return patients[id];
+export const getPatientById = (id: string): Patient | null => {
+  return patients[id] || null;
 };
 
 // Update patient
-export const updatePatient = (id: string, patientData: Partial<Patient>): Patient | undefined => {
-  if (!patients[id]) return undefined;
+export const updatePatient = (id: string, data: Partial<Patient>): Patient | null => {
+  if (!patients[id]) return null;
   
   patients = {
     ...patients,
     [id]: {
       ...patients[id],
-      ...patientData
+      ...data
     }
   };
   
@@ -182,6 +182,43 @@ export const updatePatient = (id: string, patientData: Partial<Patient>): Patien
   listenerCallbacks.forEach(callback => callback());
   
   return patients[id];
+};
+
+// Function to add a new medical visit record from a completed appointment
+export const addMedicalRecord = (
+  patientId: string, 
+  visitData: {
+    date: string;
+    diagnosis: string;
+    bloodPressure?: string;
+    weight?: string;
+    prescription?: string;
+    complaint?: string;
+  }
+): Patient | null => {
+  const patient = getPatientById(patientId);
+  if (!patient) return null;
+  
+  // Create a new visit record
+  const newVisit: Visit = {
+    date: visitData.date,
+    complaint: visitData.complaint || '',
+    diagnosis: visitData.diagnosis,
+    bloodPressure: visitData.bloodPressure || patient.bloodPressure || '',
+    weight: visitData.weight || patient.weight || '',
+    prescription: visitData.prescription || ''
+  };
+  
+  // Update patient with new visit
+  const updatedPatient = updatePatient(patientId, {
+    visits: [...patient.visits, newVisit],
+    lastVisit: visitData.date,
+    // Also update current vitals if provided
+    ...(visitData.bloodPressure ? { bloodPressure: visitData.bloodPressure } : {}),
+    ...(visitData.weight ? { weight: visitData.weight } : {})
+  });
+  
+  return updatedPatient;
 };
 
 // Hook to subscribe to patient data changes

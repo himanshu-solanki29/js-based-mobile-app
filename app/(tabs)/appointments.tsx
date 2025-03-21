@@ -484,176 +484,195 @@ export default function AppointmentsScreen() {
     
     return (
       <Card 
-      style={styles.appointmentCard}
-      onPress={() => router.push(`/patient/${item.patientId}`)}
-    >
-        <Card.Content>
-      <View style={styles.appointmentHeader}>
-            <View style={styles.appointmentRow}>
-              <View style={[
-                styles.dateBox, 
-                isStatusPending ? styles.pendingDateBox : {}
+        style={styles.appointmentCard} 
+        mode="elevated"
+        onPress={() => router.push(`/appointment/${item.id}`)}
+      >
+        <Card.Content style={styles.cardContent}>
+          <View style={styles.appointmentRow}>
+            <View style={[
+              styles.dateBox, 
+              isStatusPending ? styles.pendingDateBox : {}
+            ]}>
+              <ThemedText style={[
+                styles.dateDay,
+                isStatusPending ? styles.pendingDateText : {}
               ]}>
-                <ThemedText style={[
-                  styles.dateDay,
-                  isStatusPending ? styles.pendingDateText : {}
+                {new Date(item.date).getDate()}
+              </ThemedText>
+              <ThemedText style={[
+                styles.dateMonth,
+                isStatusPending ? styles.pendingDateText : {}
+              ]}>
+                {new Date(item.date).toLocaleString('default', { month: 'short' })}
+              </ThemedText>
+            </View>
+            
+            <View style={styles.appointmentDetails}>
+              <View style={styles.appointmentHeaderInner}>
+                <ThemedText style={styles.patientName}>{patientName}</ThemedText>
+                <View style={[
+                  styles.statusBadge,
+                  item.status === 'pending' ? styles.pendingBadge : {}
                 ]}>
-                  {new Date(item.date).getDate()}
-                </ThemedText>
-                <ThemedText style={[
-                  styles.dateMonth,
-                  isStatusPending ? styles.pendingDateText : {}
-                ]}>
-                  {new Date(item.date).toLocaleString('default', { month: 'short' })}
-          </ThemedText>
-      </View>
-      
-      <View style={styles.appointmentDetails}>
-                <View style={styles.appointmentHeaderInner}>
-                  <ThemedText style={styles.patientName}>{patientName}</ThemedText>
-                  <View style={[
-                    styles.statusBadge,
-                    item.status === 'pending' ? styles.pendingBadge : {}
-                  ]}>
-                    <ThemedText style={[
-                      styles.statusText,
-                      item.status === 'pending' ? styles.pendingStatusText : {}
-                    ]}>{item.status}</ThemedText>
-        </View>
-        </View>
-                <ThemedText style={styles.appointmentTime}>
-                  <FontAwesome5 name="clock" size={12} color={isStatusPending ? "#FF9800" : "#4CAF50"} /> {item.time}
-                </ThemedText>
-                <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
-                
-                {item.notes && (
-                  <View style={{marginTop: 8}}>
-                    <ThemedText style={styles.notesLabel}>Notes:</ThemedText>
-                    <ThemedText style={styles.notesText}>{item.notes}</ThemedText>
-                  </View>
-                )}
-        </View>
-      </View>
-      
-            {/* Appointment actions */}
-        <View style={styles.actionButtonsContainer}>
-              {item.status === 'pending' && (
-                <Menu
-                  anchor={
-                    <IconButton 
-                      icon="dots-vertical" 
-                      size={20}
-                      style={{margin: 0, marginLeft: 16}}
-                      iconColor="#4CAF50"
-                      onPress={() => {
-                        setSelectedAppointment(item);
-                        setMenuVisible(true);
-                      }}
-                    />
-                  }
-                  visible={menuVisible && selectedAppointment?.id === item.id}
-                  onDismiss={() => setMenuVisible(false)}
-                  style={styles.menu}
-                  contentStyle={styles.menuContent}
-                >
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      confirmAppointment();
-                    }}
-                    title="Confirm Appointment" 
-                    leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      // Handle cancellation using the new function
-                      updateAppointmentStatus(item.id, 'cancelled');
-                      setFilteredAppointments([...filteredAppointments]);
-                    }}
-                    title="Cancel Appointment" 
-                    leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
-                    titleStyle={{color: '#F44336', fontWeight: '500', fontSize: 14}}
-                    style={styles.menuItem}
-                  />
-                  <Divider style={{marginVertical: 2}} />
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      alert(`Calling ${patientName}...`);
-                    }}
-                    title="Call Patient" 
-                    leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      alert(`Sending message to ${patientName}...`);
-                    }}
-                    title="Message Patient" 
-                    leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                </Menu>
-              )}
-              {item.status === 'confirmed' && (
-                <Menu
-                  anchor={
-                    <IconButton 
-                      icon="dots-vertical" 
-                      size={20}
-                      style={{margin: 0, marginLeft: 16}}
-                      iconColor="#4CAF50"
-                      onPress={() => {
-                        setSelectedAppointment(item);
-                        setMenuVisible(true);
-                      }}
-                    />
-                  }
-                  visible={menuVisible && selectedAppointment?.id === item.id}
-                  onDismiss={() => setMenuVisible(false)}
-                  style={styles.menu}
-                  contentStyle={styles.menuContent}
-                >
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      openCompletionDialog();
-                    }}
-                    title="Mark Completed" 
-                    leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                  <Divider style={{marginVertical: 2}} />
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      alert(`Calling ${patientName}...`);
-                    }}
-                    title="Call Patient" 
-                    leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                  <Menu.Item 
-                    onPress={() => {
-                      setMenuVisible(false);
-                      alert(`Sending message to ${patientName}...`);
-                    }}
-                    title="Message Patient" 
-                    leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
-                    style={styles.menuItem}
-                    titleStyle={{fontWeight: '500', fontSize: 14}}
-                  />
-                </Menu>
+                  <ThemedText style={[
+                    styles.statusText,
+                    item.status === 'pending' ? styles.pendingStatusText : {}
+                  ]}>{item.status}</ThemedText>
+                </View>
+              </View>
+              <ThemedText style={styles.appointmentTime}>
+                <FontAwesome5 name="clock" size={12} color={isStatusPending ? "#FF9800" : "#4CAF50"} /> {item.time}
+              </ThemedText>
+              <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
+              
+              {item.notes && (
+                <View style={{marginTop: 8}}>
+                  <ThemedText style={styles.notesLabel}>Notes:</ThemedText>
+                  <ThemedText style={styles.notesText}>{item.notes}</ThemedText>
+                </View>
               )}
             </View>
+          </View>
+          
+          {/* Appointment actions */}
+          <View style={styles.actionButtonsContainer}>
+            {item.status === 'pending' && (
+              <Menu
+                anchor={
+                  <IconButton 
+                    icon="dots-vertical" 
+                    size={20}
+                    style={{margin: 0, marginLeft: 16}}
+                    iconColor="#4CAF50"
+                    onPress={() => {
+                      setSelectedAppointment(item);
+                      setMenuVisible(true);
+                    }}
+                  />
+                }
+                visible={menuVisible && selectedAppointment?.id === item.id}
+                onDismiss={() => setMenuVisible(false)}
+                style={styles.menu}
+                contentStyle={styles.menuContent}
+              >
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    router.push(`/appointment/${item.id}`);
+                  }}
+                  title="View Details" 
+                  leadingIcon={props => <FontAwesome5 name="eye" size={16} color="#4CAF50" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    confirmAppointment();
+                  }}
+                  title="Confirm Appointment" 
+                  leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    // Handle cancellation using the new function
+                    updateAppointmentStatus(item.id, 'cancelled');
+                    setFilteredAppointments([...filteredAppointments]);
+                  }}
+                  title="Cancel Appointment" 
+                  leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
+                  titleStyle={{color: '#F44336', fontWeight: '500', fontSize: 14}}
+                  style={styles.menuItem}
+                />
+                <Divider style={{marginVertical: 2}} />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    alert(`Calling ${patientName}...`);
+                  }}
+                  title="Call Patient" 
+                  leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    alert(`Sending message to ${patientName}...`);
+                  }}
+                  title="Message Patient" 
+                  leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+              </Menu>
+            )}
+            {item.status === 'confirmed' && (
+              <Menu
+                anchor={
+                  <IconButton 
+                    icon="dots-vertical" 
+                    size={20}
+                    style={{margin: 0, marginLeft: 16}}
+                    iconColor="#4CAF50"
+                    onPress={() => {
+                      setSelectedAppointment(item);
+                      setMenuVisible(true);
+                    }}
+                  />
+                }
+                visible={menuVisible && selectedAppointment?.id === item.id}
+                onDismiss={() => setMenuVisible(false)}
+                style={styles.menu}
+                contentStyle={styles.menuContent}
+              >
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    router.push(`/appointment/${item.id}`);
+                  }}
+                  title="View Details" 
+                  leadingIcon={props => <FontAwesome5 name="eye" size={16} color="#4CAF50" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    openCompletionDialog();
+                  }}
+                  title="Mark Completed" 
+                  leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Divider style={{marginVertical: 2}} />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    alert(`Calling ${patientName}...`);
+                  }}
+                  title="Call Patient" 
+                  leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+                <Menu.Item 
+                  onPress={() => {
+                    setMenuVisible(false);
+                    alert(`Sending message to ${patientName}...`);
+                  }}
+                  title="Message Patient" 
+                  leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
+                  style={styles.menuItem}
+                  titleStyle={{fontWeight: '500', fontSize: 14}}
+                />
+              </Menu>
+            )}
           </View>
         </Card.Content>
       </Card>
@@ -1085,5 +1104,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 4,
     padding: 8,
+  },
+  cardContent: {
+    padding: 16,
   },
 }); 

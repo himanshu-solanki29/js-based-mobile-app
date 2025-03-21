@@ -187,21 +187,53 @@ export const updateAppointmentStatus = (
   if (newStatus === 'completed' && oldStatus !== 'completed') {
     const patient = getPatientById(appointment.patientId);
     if (patient) {
+      // Extract medical information from notes if provided
+      let diagnosis = '';
+      let bloodPressure = patient.bloodPressure || 'Not measured';
+      let weight = patient.weight || 'Not measured';
+      let prescription = 'No prescription recorded';
+      
+      if (remarks) {
+        // Parse medical information from notes
+        // Expected format from medical form: "Diagnosis: <value>\nBlood Pressure: <value>\nWeight: <value>\nPrescription: <value>"
+        const diagnosisMatch = remarks.match(/Diagnosis:\s*([^\n]+)/);
+        const bpMatch = remarks.match(/Blood Pressure:\s*([^\n]+)/);
+        const weightMatch = remarks.match(/Weight:\s*([^\n]+)/);
+        const prescriptionMatch = remarks.match(/Prescription:\s*([^\n]+)/);
+        
+        if (diagnosisMatch) diagnosis = diagnosisMatch[1];
+        if (bpMatch) bloodPressure = bpMatch[1];
+        if (weightMatch) weight = weightMatch[1];
+        if (prescriptionMatch) prescription = prescriptionMatch[1];
+      }
+      
       // Create a new visit entry
       const newVisit = {
         date: appointment.date,
         complaint: appointment.reason,
-        diagnosis: remarks || 'No diagnosis recorded',
-        bloodPressure: patient.bloodPressure || 'Not measured',
-        weight: patient.weight || 'Not measured',
-        prescription: 'No prescription recorded'
+        diagnosis: diagnosis || remarks || 'No diagnosis recorded',
+        bloodPressure,
+        weight,
+        prescription
       };
       
-      // Update the patient with the new visit
-      updatePatient(patient.id, {
+      // Also update the patient's current vitals if provided
+      const patientUpdates: any = {
         visits: [...patient.visits, newVisit],
         lastVisit: appointment.date
-      });
+      };
+      
+      // Only update these if they actually have values from the form
+      if (bloodPressure && bloodPressure !== 'Not measured' && bloodPressure !== 'Not recorded') {
+        patientUpdates.bloodPressure = bloodPressure;
+      }
+      
+      if (weight && weight !== 'Not measured' && weight !== 'Not recorded') {
+        patientUpdates.weight = weight;
+      }
+      
+      // Update the patient with the new visit and potentially new vitals
+      updatePatient(patient.id, patientUpdates);
     }
   }
   

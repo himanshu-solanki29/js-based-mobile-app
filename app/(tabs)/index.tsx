@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList } from "react-native";
+import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -9,6 +9,7 @@ import { formatDate } from "@/utils/dateFormat";
 import { MOCK_APPOINTMENTS, AppointmentStatus, sortAppointmentsByDateDesc } from "../../utils/appointmentStore";
 import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
+import { Appointment } from '../../utils/appointmentStore';
 
 // Function to get upcoming appointments (both confirmed and pending)
 const getUpcomingAppointments = () => {
@@ -222,6 +223,51 @@ export default function HomeScreen() {
     );
   };
   
+  const AppointmentItem = ({ item }: { item: Appointment }) => {
+    const statusTextColors = {
+      confirmed: '#2E7D32',
+      pending: '#E65100',
+      cancelled: '#C62828',
+      completed: '#00695C',
+    };
+
+    const statusBgColors = {
+      confirmed: '#E8F5E9',
+      pending: '#FFF3E0',
+      cancelled: '#FFEBEE',
+      completed: '#E0F2F1',
+    };
+
+    const formattedDate = formatDate(item.date);
+    
+    return (
+      <Pressable 
+        style={styles.appointmentItem}
+        onPress={() => router.push(`/appointment/${item.id}`)}
+      >
+        <View style={styles.appointmentHeader}>
+          <ThemedText style={styles.appointmentPatient}>{item.patientName}</ThemedText>
+          <View 
+            style={[
+              styles.statusBadge, 
+              { backgroundColor: statusBgColors[item.status] }
+            ]}
+          >
+            <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
+              {item.status}
+            </ThemedText>
+          </View>
+        </View>
+        <ThemedText style={styles.appointmentTime}>
+          <FontAwesome5 name="calendar-alt" size={12} /> {formattedDate}, {item.time}
+        </ThemedText>
+        <ThemedText style={styles.appointmentReason} numberOfLines={1} ellipsizeMode="tail">
+          {item.reason}
+        </ThemedText>
+      </Pressable>
+    );
+  };
+  
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -297,48 +343,7 @@ export default function HomeScreen() {
             upcomingAppointments.map((item, index) => (
               <View key={item.id}>
                 {index > 0 && <Divider style={styles.appointmentDivider} />}
-                <View style={styles.appointmentItem}>
-                  <View style={styles.appointmentRow}>
-                    <View style={[
-                      styles.dateBox, 
-                      item.status === 'pending' ? styles.pendingDateBox : {}
-                    ]}>
-                      <ThemedText style={[
-                        styles.dateDay,
-                        item.status === 'pending' ? styles.pendingDateText : {}
-                      ]}>
-                        {new Date(item.date).getDate()}
-                      </ThemedText>
-                      <ThemedText style={[
-                        styles.dateMonth,
-                        item.status === 'pending' ? styles.pendingDateText : {}
-                      ]}>
-                        {new Date(item.date).toLocaleString('default', { month: 'short' })}
-                      </ThemedText>
-                    </View>
-                    
-                    <View style={styles.appointmentDetails}>
-                      <View style={styles.appointmentHeader}>
-                        <ThemedText style={styles.patientName}>{item.patientName}</ThemedText>
-                        <View style={[
-                          styles.statusBadge,
-                          item.status === 'pending' ? styles.pendingBadge : {}
-                        ]}>
-                          <ThemedText style={[
-                            styles.statusText,
-                            item.status === 'pending' ? styles.pendingStatusText : {}
-                          ]}>{item.status}</ThemedText>
-                        </View>
-                      </View>
-                      <ThemedText style={styles.appointmentTime}>
-                        <FontAwesome5 name="clock" size={12} color={item.status === 'pending' ? "#FF9800" : "#4CAF50"} /> {item.time}
-                      </ThemedText>
-                      <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
-                    </View>
-                    
-                    {renderAppointmentMenu(item)}
-                  </View>
-                </View>
+                <AppointmentItem item={item} />
               </View>
             ))
           )}
@@ -626,53 +631,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  appointmentRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  dateBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E8F5E9',
-    borderRadius: 10,
-    padding: 8,
-    width: 48,
-    height: 48,
-  },
-  pendingDateBox: {
-    backgroundColor: '#FFF3E0',
-  },
-  dateDay: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  pendingDateText: {
-    color: '#E65100',
-  },
-  dateMonth: {
-    fontSize: 12,
-    color: '#2E7D32',
-  },
-  appointmentDetails: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
   appointmentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  patientName: {
+  appointmentPatient: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  appointmentTime: {
-    fontSize: 12,
-    color: '#757575',
-    marginTop: 2,
   },
   statusBadge: {
     backgroundColor: '#E8F5E9',
@@ -682,19 +648,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pendingBadge: {
-    backgroundColor: '#FFF3E0',
-  },
   statusText: {
     color: '#2E7D32',
     fontWeight: '600',
     fontSize: 12,
     textTransform: 'capitalize',
   },
-  pendingStatusText: {
-    color: '#E65100',
+  appointmentTime: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 2,
   },
-  reasonText: {
+  appointmentReason: {
     fontSize: 14,
     marginTop: 4,
   },
