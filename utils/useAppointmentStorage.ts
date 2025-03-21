@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import appointmentStorageService from './appointmentStorageService';
-import { Appointment } from './appointmentStore';
+import { Appointment, AppointmentStatus } from './appointmentStore';
 
 // Custom hook for accessing appointment data from storage
 export const useAppointmentStorage = () => {
@@ -37,7 +37,14 @@ export const useAppointmentStorage = () => {
   }, []);
 
   // Add a new appointment
-  const addAppointment = async (appointmentData: Omit<Appointment, 'id'>) => {
+  const addAppointment = async (appointmentData: {
+    date: Date;
+    time: string;
+    reason: string;
+    notes?: string;
+    patientId: string;
+    status?: AppointmentStatus;
+  }) => {
     try {
       const newAppointment = await appointmentStorageService.addAppointment(appointmentData);
       return newAppointment;
@@ -49,9 +56,9 @@ export const useAppointmentStorage = () => {
   };
 
   // Update an appointment status
-  const updateAppointmentStatus = async (id: string, status: Appointment['status']) => {
+  const updateAppointmentStatus = async (id: string, status: AppointmentStatus, remarks?: string) => {
     try {
-      const updatedAppointment = await appointmentStorageService.updateAppointmentStatus(id, status);
+      const updatedAppointment = await appointmentStorageService.updateAppointmentStatus(id, status, remarks);
       return updatedAppointment;
     } catch (err) {
       console.error('Error updating appointment status:', err);

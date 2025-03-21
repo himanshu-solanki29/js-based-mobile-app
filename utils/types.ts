@@ -1,2 +1,4 @@
-// Appointment status types only - removed MedicalRecord interface
-export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed'; 
+// Define appointment status types
+export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+
+// Export other common types as needed 
