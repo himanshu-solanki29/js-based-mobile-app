@@ -589,11 +589,16 @@ export default function AppointmentsScreen() {
             ? STATUS_COLORS[option as AppointmentStatus] 
             : { bg: '#f0f0f0', text: '#757575', accent: '#757575' };
           
+          // Use a consistent color for non-selected state
+          const nonSelectedBg = 'transparent';
+          const nonSelectedBorder = '#9E9E9E';
+          const nonSelectedText = '#616161';
+          
           return (
             <TouchableRipple
               key={option}
               onPress={() => setSelectedStatus(option)}
-              rippleColor={isSelected ? `${chipColors.accent}20` : "rgba(0, 0, 0, 0.08)"}
+              rippleColor="rgba(0, 0, 0, 0.08)"
               style={{ 
                 borderRadius: 20,
                 marginHorizontal: 4,
@@ -605,15 +610,16 @@ export default function AppointmentsScreen() {
                 style={[
                   styles.statusChip,
                   { 
-                    backgroundColor: isSelected ? chipColors.bg : 'transparent',
-                    borderColor: chipColors.accent,
-                    borderWidth: isSelected ? 0 : 1
+                    backgroundColor: isSelected ? chipColors.bg : nonSelectedBg,
+                    borderColor: isSelected ? 'transparent' : nonSelectedBorder,
+                    borderWidth: 1
                   }
                 ]}
                 textStyle={{
-                  color: isSelected ? chipColors.text : chipColors.accent,
+                  color: isSelected ? chipColors.text : nonSelectedText,
                   fontWeight: isSelected ? 'bold' : 'normal'
                 }}
+                onPress={undefined} // Disable Chip's onPress as we're using TouchableRipple
               >
                 {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
               </Chip>
