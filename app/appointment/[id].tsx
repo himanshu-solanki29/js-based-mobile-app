@@ -1,6 +1,6 @@
 import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -67,6 +67,8 @@ export default function AppointmentDetailsScreen() {
   const router = useRouter();
   const { showToast } = useGlobalToast();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -121,7 +123,7 @@ export default function AppointmentDetailsScreen() {
     }
     
     setLoading(false);
-  }, [id]);
+  }, [id, refreshKey]);
   
   // Function to handle completion with medical record
   const handleCompletionWithMedicalRecord = (medicalData: MedicalRecord) => {
@@ -183,7 +185,11 @@ export default function AppointmentDetailsScreen() {
       setStatusChanged(true);
       setTimeout(() => setStatusChanged(false), 2000);
       
+      // Update local state
       setAppointment(updatedAppointment);
+      
+      // Trigger a refresh to make sure all components using the appointments data are updated
+      setRefreshKey(prev => prev + 1);
       
       // Show success notification with appropriate type based on status
       if (selectedStatus === 'confirmed') {
@@ -205,6 +211,18 @@ export default function AppointmentDetailsScreen() {
       showToast("Failed to update appointment status", "error");
       setActionInProgress(false);
     }
+  };
+  
+  const handleConfirmAppointment = () => {
+    handleStatusChange();
+  };
+
+  const handleCompleteAppointment = () => {
+    handleStatusChange();
+  };
+
+  const handleCancelAppointment = () => {
+    handleStatusChange();
   };
   
   // Helper to open status change dialog

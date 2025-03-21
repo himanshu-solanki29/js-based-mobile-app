@@ -1,8 +1,8 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable } from "react-native";
+import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable, RefreshControl } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
@@ -14,18 +14,22 @@ import {
 import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput, TouchableRipple } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
+import { useGlobalToast } from "@/components/GlobalToastProvider";
 
 // Function to get upcoming appointments is removed - we use the useAppointments hook
 
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { showToast } = useGlobalToast();
   const { patientsArray } = usePatients();
   const { appointments, upcomingAppointments } = useAppointments();
   const [todayAppointments, setTodayAppointments] = useState(0);
   const [weekAppointments, setWeekAppointments] = useState(0);
   const [pendingAppointments, setPendingAppointments] = useState(0);
   const [completedAppointments, setCompletedAppointments] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // For appointment actions
   const [menuVisible, setMenuVisible] = useState(false);
@@ -34,6 +38,13 @@ export default function HomeScreen() {
   const [completionRemarks, setCompletionRemarks] = useState('');
   const [confirmDialogVisible, setConfirmDialogVisible] = useState(false);
   const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
+  
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshTrigger(prev => prev + 1);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
   
   // Calculate dashboard statistics
   useEffect(() => {
@@ -58,7 +69,7 @@ export default function HomeScreen() {
     const completedCount = appointments.filter(a => a.status === 'completed').length;
     setCompletedAppointments(completedCount);
     
-  }, [appointments]);
+  }, [appointments, refreshTrigger]);
   
   // Handle marking appointment as completed
   const handleCompleteAppointment = () => {
@@ -73,15 +84,11 @@ export default function HomeScreen() {
       // Update the status with remarks if provided
       updateAppointmentStatus(selectedAppointment.id, 'completed', completionRemarks || undefined);
       
-      // Update statistics
-      const completedCount = appointments.filter(a => a.status === 'completed').length;
-      setCompletedAppointments(completedCount);
+      // Trigger refresh
+      setRefreshTrigger(prev => prev + 1);
       
-      // Decrease pending if it was pending
-      if (selectedAppointment.status === 'pending') {
-        const pendingCount = appointments.filter(a => a.status === 'pending').length;
-        setPendingAppointments(pendingCount);
-      }
+      // Show success message
+      showToast("Appointment marked as completed", "success");
       
       // Reset the form
       setCompletionRemarks('');
@@ -102,9 +109,11 @@ export default function HomeScreen() {
       // Update the status
       updateAppointmentStatus(selectedAppointment.id, 'confirmed');
       
-      // Update statistics
-      const pendingCount = appointments.filter(a => a.status === 'pending').length;
-      setPendingAppointments(pendingCount);
+      // Trigger refresh
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Show success message
+      showToast("Appointment confirmed", "success");
       
       // Reset the selected appointment
       setSelectedAppointment(null);
@@ -124,9 +133,11 @@ export default function HomeScreen() {
       // Update the status
       updateAppointmentStatus(selectedAppointment.id, 'cancelled');
       
-      // Update statistics
-      const pendingCount = appointments.filter(a => a.status === 'pending').length;
-      setPendingAppointments(pendingCount);
+      // Trigger refresh
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Show success message
+      showToast("Appointment cancelled", "success");
       
       // Reset the selected appointment
       setSelectedAppointment(null);
@@ -231,6 +242,30 @@ export default function HomeScreen() {
 
     const formattedDate = formatDate(item.date);
     
+    // Function to handle quick status update
+    const handleQuickStatusUpdate = (event: any) => {
+      event.stopPropagation();
+      
+      let newStatus: 'confirmed' | 'completed' | null = null;
+      
+      if (item.status === 'pending') {
+        newStatus = 'confirmed';
+      } else if (item.status === 'confirmed') {
+        newStatus = 'completed';
+      }
+      
+      if (newStatus) {
+        // Update the status
+        updateAppointmentStatus(item.id, newStatus);
+        
+        // Trigger refresh
+        setRefreshTrigger(prev => prev + 1);
+        
+        // Show success message
+        showToast(`Appointment ${newStatus}`, "success");
+      }
+    };
+    
     return (
       <TouchableRipple
         style={styles.appointmentItem}
@@ -240,16 +275,22 @@ export default function HomeScreen() {
         <View>
           <View style={styles.appointmentHeader}>
             <ThemedText style={styles.appointmentPatient}>{item.patientName}</ThemedText>
-            <View 
-              style={[
-                styles.statusBadge, 
-                { backgroundColor: statusBgColors[item.status] }
-              ]}
+            <TouchableRipple
+              onPress={handleQuickStatusUpdate}
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{ borderRadius: 10 }}
             >
-              <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
-                {item.status}
-              </ThemedText>
-            </View>
+              <View 
+                style={[
+                  styles.statusBadge, 
+                  { backgroundColor: statusBgColors[item.status] }
+                ]}
+              >
+                <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
+                  {item.status}
+                </ThemedText>
+              </View>
+            </TouchableRipple>
           </View>
           <ThemedText style={styles.appointmentTime}>
             <FontAwesome5 name="calendar-alt" size={12} /> {formattedDate}, {item.time}
@@ -264,7 +305,18 @@ export default function HomeScreen() {
   
   return (
       <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#4CAF50']}
+            tintColor="#4CAF50"
+          />
+        }
+      >
         <View style={styles.header}>
           <View>
             <ThemedText style={styles.welcomeText}>Welcome back</ThemedText>

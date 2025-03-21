@@ -141,6 +141,8 @@ export default function AppointmentsScreen() {
     sortAppointmentsByDateDesc(appointments.filter(apt => apt.status === 'confirmed'))
   );
   
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
   // Filter appointments based on search query, selected date/range, and status
   useEffect(() => {
     let filtered = [...appointments];
@@ -175,7 +177,7 @@ export default function AppointmentsScreen() {
     filtered = sortAppointmentsByDateDesc(filtered);
     
     setFilteredAppointments(filtered);
-  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus]);
+  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments, refreshTrigger]);
 
   // Function to format the date filter for display
   const getFormattedDateRange = () => {
@@ -454,6 +456,20 @@ export default function AppointmentsScreen() {
     // Get status colors
     const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.confirmed;
     
+    // Function to handle appointment status change directly from the card
+    const handleStatusChange = (newStatus: AppointmentStatus) => {
+      updateAppointmentStatus(item.id, newStatus);
+      
+      // Trigger a refresh to update the UI
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Show toast notification
+      showToast(
+        `Appointment status updated to ${newStatus}`,
+        'success'
+      );
+    };
+    
     return (
       <Card 
         style={styles.appointmentCard}
@@ -483,15 +499,27 @@ export default function AppointmentsScreen() {
             <View style={styles.appointmentDetails}>
               <View style={styles.appointmentHeaderInner}>
                 <ThemedText style={styles.patientName}>{patientName}</ThemedText>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: statusColors.bg }
-                ]}>
-                  <ThemedText style={[
-                    styles.statusText,
-                    { color: statusColors.text }
-                  ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
-                </View>
+                <TouchableRipple
+                  onPress={() => {
+                    if (item.status === 'pending') {
+                      handleStatusChange('confirmed');
+                    } else if (item.status === 'confirmed') {
+                      handleStatusChange('completed');
+                    }
+                  }}
+                  rippleColor="rgba(0, 0, 0, 0.1)"
+                  style={{ borderRadius: 12 }}
+                >
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: statusColors.bg }
+                  ]}>
+                    <ThemedText style={[
+                      styles.statusText,
+                      { color: statusColors.text }
+                    ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
+                  </View>
+                </TouchableRipple>
               </View>
               <ThemedText style={styles.appointmentTime}>
                 <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
@@ -526,10 +554,13 @@ export default function AppointmentsScreen() {
       reason: appointmentData.reason,
       notes: appointmentData.notes || '',
       patientId: appointmentData.patientId,
-      status: 'pending' // Changed from 'confirmed' to 'pending'
+      status: 'pending'
     });
     
-    // No need to manually update the state here - the useAppointments hook will handle it
+    // Trigger a refresh to update the UI
+    setRefreshTrigger(prev => prev + 1);
+    
+    // Close dialog
     setSchedulerVisible(false);
     
     // Show toast notification
