@@ -87,17 +87,22 @@ export function AppointmentScheduler({
     setFilteredPatients(patients);
   }, [patients]);
 
+  // Find patient by ID effect
+  useEffect(() => {
+    // Find and set selected patient based on patientId prop
+    if (patientId && patients.length > 0) {
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        setSelectedPatient(patient);
+      }
+    }
+  }, [patientId, patients]);
+
   // Initialize form values when the component becomes visible
   useEffect(() => {
     if (isVisible) {
-      // Set patient if patientId is provided
-      if (patientId) {
-        const patient = patients.find(p => p.id === patientId);
-        if (patient) {
-          setSelectedPatient(patient);
-        }
-      } else if (!wasVisibleRef.current) {
-        // Only reset the patient selection if this is the first time opening
+      // Only reset the patient selection if this is the first time opening
+      if (!wasVisibleRef.current && !patientId) {
         setSelectedPatient(null);
       }
       

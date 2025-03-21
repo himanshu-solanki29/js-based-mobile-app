@@ -276,12 +276,14 @@ export default function ExploreScreen() {
       )}
       
       {/* Appointment Scheduler */}
-      <AppointmentScheduler
-        isVisible={isSchedulerVisible}
-        onClose={() => setSchedulerVisible(false)}
-        onSchedule={handleScheduleAppointment}
-        patientId={selectedPatientId || undefined}
-      />
+      {isSchedulerVisible && selectedPatientId && (
+        <AppointmentScheduler
+          isVisible={isSchedulerVisible}
+          onClose={() => setSchedulerVisible(false)}
+          onSchedule={handleScheduleAppointment}
+          patientId={selectedPatientId}
+        />
+      )}
       
       <FAB
         icon="plus"
