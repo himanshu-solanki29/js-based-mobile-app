@@ -20,11 +20,22 @@ import {
 import { 
   MOCK_APPOINTMENTS, 
   Appointment, 
-  AppointmentStatus, 
   updateAppointmentStatus, 
   getPatientName 
 } from "@/utils/appointmentStore";
 import { getPatientById } from "@/utils/patientStore";
+import { AppointmentStatus } from "@/utils/types";
+import { MedicalRecordForm } from "@/components/MedicalRecordForm";
+import { MedicalRecordCard } from "@/components/MedicalRecordCard";
+
+// Define the MedicalRecord interface directly here to avoid any import issues
+interface MedicalRecord {
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+}
 
 export default function AppointmentDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -36,10 +47,13 @@ export default function AppointmentDetailsScreen() {
   
   // Medical record form fields
   const [medicalRecordDialogVisible, setMedicalRecordDialogVisible] = useState(false);
-  const [remarks, setRemarks] = useState("");
-  const [bloodPressure, setBloodPressure] = useState("");
-  const [weight, setWeight] = useState("");
-  const [prescription, setPrescription] = useState("");
+  const [medicalRecord, setMedicalRecord] = useState<MedicalRecord>({
+    complaint: '',
+    diagnosis: '',
+    bloodPressure: '',
+    weight: '',
+    prescription: ''
+  });
   
   // Status change dialog
   const [statusChangeDialogVisible, setStatusChangeDialogVisible] = useState(false);
@@ -57,20 +71,24 @@ export default function AppointmentDetailsScreen() {
         setPatient(patientData);
         
         // Pre-fill medical record form with patient's current data
-        setBloodPressure(patientData.bloodPressure || "");
-        setWeight(patientData.weight || "");
+        setMedicalRecord(prev => ({
+          ...prev,
+          complaint: foundAppointment.reason, // Use reason as initial complaint
+          bloodPressure: patientData.bloodPressure || "",
+          weight: patientData.weight || ""
+        }));
       }
     }
     
     setLoading(false);
   }, [id]);
   
-  // Function to handle completing appointment with medical record
+  // Updated handleCompletionWithMedicalRecord function to use the MedicalRecord interface
   const handleCompletionWithMedicalRecord = () => {
     if (!appointment) return;
     
     // Create a combined note with all medical record information
-    const fullNotes = `Diagnosis: ${remarks || 'No diagnosis provided'}\nBlood Pressure: ${bloodPressure || 'Not recorded'}\nWeight: ${weight || 'Not recorded'}\nPrescription: ${prescription || 'No prescription'}`; 
+    const fullNotes = `Complaint: ${medicalRecord.complaint || appointment.reason}\nDiagnosis: ${medicalRecord.diagnosis || 'No diagnosis provided'}\nBlood Pressure: ${medicalRecord.bloodPressure || 'Not recorded'}\nWeight: ${medicalRecord.weight || 'Not recorded'}\nPrescription: ${medicalRecord.prescription || 'No prescription'}`; 
     
     // Update the appointment status with the combined notes
     const updatedAppointment = updateAppointmentStatus(
@@ -81,13 +99,20 @@ export default function AppointmentDetailsScreen() {
     
     if (updatedAppointment) {
       setAppointment(updatedAppointment);
-      setMedicalRecordDialogVisible(false);
       Alert.alert(
         "Appointment Completed",
         "Appointment has been marked as completed with medical record.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
+  };
+  
+  // Handlers for medical record form fields
+  const handleMedicalRecordChange = (field: keyof MedicalRecord, value: string) => {
+    setMedicalRecord(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
   
   // Function to handle changing appointment status
@@ -325,131 +350,20 @@ export default function AppointmentDetailsScreen() {
         
         {/* Medical Record Card - only show for completed appointments */}
         {appointment.status === 'completed' && appointment.notes && (
-          <Surface style={styles.card} elevation={1}>
-            <View style={styles.cardHeader}>
-              <FontAwesome5 name="notes-medical" size={18} color="#00897B" style={styles.cardHeaderIcon} />
-              <ThemedText style={styles.cardHeaderTitle}>Medical Record</ThemedText>
-            </View>
-            
-            <Divider style={styles.divider} />
-            
-            <View style={styles.medicalInfoContainer}>
-              {appointment.notes.includes('Diagnosis:') ? (
-                <>
-                  {appointment.notes.match(/Diagnosis:\s*([^\n]+)/) && (
-                    <View style={styles.medicalInfoRow}>
-                      <ThemedText style={styles.medicalInfoLabel}>Diagnosis:</ThemedText>
-                      <ThemedText style={styles.medicalInfoValue}>
-                        {appointment.notes.match(/Diagnosis:\s*([^\n]+)/)[1]}
-                      </ThemedText>
-                    </View>
-                  )}
-                  
-                  {appointment.notes.match(/Blood Pressure:\s*([^\n]+)/) && (
-                    <View style={styles.medicalInfoRow}>
-                      <ThemedText style={styles.medicalInfoLabel}>Blood Pressure:</ThemedText>
-                      <ThemedText style={styles.medicalInfoValue}>
-                        {appointment.notes.match(/Blood Pressure:\s*([^\n]+)/)[1]}
-                      </ThemedText>
-                    </View>
-                  )}
-                  
-                  {appointment.notes.match(/Weight:\s*([^\n]+)/) && (
-                    <View style={styles.medicalInfoRow}>
-                      <ThemedText style={styles.medicalInfoLabel}>Weight:</ThemedText>
-                      <ThemedText style={styles.medicalInfoValue}>
-                        {appointment.notes.match(/Weight:\s*([^\n]+)/)[1]}
-                      </ThemedText>
-                    </View>
-                  )}
-                  
-                  {appointment.notes.match(/Prescription:\s*([^\n]+)/) && (
-                    <View style={styles.medicalInfoRow}>
-                      <ThemedText style={styles.medicalInfoLabel}>Prescription:</ThemedText>
-                      <ThemedText style={styles.medicalInfoValue}>
-                        {appointment.notes.match(/Prescription:\s*([^\n]+)/)[1]}
-                      </ThemedText>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.medicalInfoRow}>
-                  <ThemedText style={styles.medicalInfoValue}>{appointment.notes}</ThemedText>
-                </View>
-              )}
-            </View>
-          </Surface>
+          <MedicalRecordCard notes={appointment.notes} />
         )}
         
         {/* Medical Record Form for confirmed appointments */}
         {appointment.status === 'confirmed' && (
-          <Surface style={styles.card} elevation={1}>
-            <View style={styles.cardHeader}>
-              <FontAwesome5 name="notes-medical" size={18} color="#00897B" style={styles.cardHeaderIcon} />
-              <ThemedText style={styles.cardHeaderTitle}>Add Medical Record</ThemedText>
-            </View>
-            
-            <Divider style={styles.divider} />
-            
-            <View style={styles.medicalRecordFormContainer}>
-              <TextInput
-                label="Diagnosis/Remarks"
-                value={remarks}
-                onChangeText={setRemarks}
-                mode="outlined"
-                style={styles.input}
-                multiline
-                numberOfLines={2}
-                outlineColor="#E0E0E0"
-                activeOutlineColor="#4CAF50"
-              />
-              
-              <TextInput
-                label="Blood Pressure"
-                value={bloodPressure}
-                onChangeText={setBloodPressure}
-                mode="outlined"
-                style={styles.input}
-                outlineColor="#E0E0E0"
-                activeOutlineColor="#4CAF50"
-                placeholder="e.g. 120/80"
-              />
-              
-              <TextInput
-                label="Weight"
-                value={weight}
-                onChangeText={setWeight}
-                mode="outlined"
-                style={styles.input}
-                outlineColor="#E0E0E0"
-                activeOutlineColor="#4CAF50"
-                placeholder="e.g. 70 kg"
-              />
-              
-              <TextInput
-                label="Prescription"
-                value={prescription}
-                onChangeText={setPrescription}
-                mode="outlined"
-                style={styles.input}
-                multiline
-                numberOfLines={3}
-                outlineColor="#E0E0E0"
-                activeOutlineColor="#4CAF50"
-              />
-              
-              <Button 
-                mode="contained"
-                icon={() => <FontAwesome5 name="check-circle" size={16} color="#FFFFFF" />}
-                style={styles.completeButton}
-                buttonColor="#4CAF50"
-                textColor="#FFFFFF"
-                onPress={handleCompletionWithMedicalRecord}
-              >
-                Complete Appointment
-              </Button>
-            </View>
-          </Surface>
+          <MedicalRecordForm
+            initialValues={{
+              complaint: appointment.reason,
+              bloodPressure: patient.bloodPressure || '',
+              weight: patient.weight || '',
+            }}
+            onSubmit={handleCompletionWithMedicalRecord}
+            submitButtonText="Complete Appointment"
+          />
         )}
         
         {/* Action buttons at the bottom */}

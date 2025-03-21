@@ -6,34 +6,26 @@ import React, { useEffect, useState } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
-import { MOCK_APPOINTMENTS, AppointmentStatus, sortAppointmentsByDateDesc } from "../../utils/appointmentStore";
+import { 
+  updateAppointmentStatus,
+  useAppointments,
+  sortAppointmentsByDateDesc
+} from "../../utils/appointmentStore";
 import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
 
-// Function to get upcoming appointments (both confirmed and pending)
-const getUpcomingAppointments = () => {
-  // Get all confirmed and pending appointments
-  const relevantAppointments = MOCK_APPOINTMENTS.filter(
-    (appointment) => appointment.status === 'confirmed' || appointment.status === 'pending'
-  );
-  
-  // Sort by date and time (most recent first)
-  const sortedAppointments = sortAppointmentsByDateDesc(relevantAppointments);
-  
-  // Take up to the next 4 appointments
-  return sortedAppointments.slice(0, 4);
-};
+// Function to get upcoming appointments is removed - we use the useAppointments hook
 
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { patientsArray } = usePatients();
+  const { appointments, upcomingAppointments } = useAppointments();
   const [todayAppointments, setTodayAppointments] = useState(0);
   const [weekAppointments, setWeekAppointments] = useState(0);
   const [pendingAppointments, setPendingAppointments] = useState(0);
   const [completedAppointments, setCompletedAppointments] = useState(0);
-  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   
   // For appointment actions
   const [menuVisible, setMenuVisible] = useState(false);
@@ -50,47 +42,48 @@ export default function HomeScreen() {
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weekStartStr = weekStart.toISOString().split('T')[0];
     
-    const todayCount = MOCK_APPOINTMENTS.filter(a => a.date === today).length;
-    const weekCount = MOCK_APPOINTMENTS.filter(a => a.date >= weekStartStr).length;
-    const pendingCount = MOCK_APPOINTMENTS.filter(a => a.status === 'pending').length;
-    const completedCount = MOCK_APPOINTMENTS.filter(a => a.status === 'completed').length;
-    
+    // Today's appointments
+    const todayCount = appointments.filter(a => a.date === today).length;
     setTodayAppointments(todayCount);
+    
+    // This week's appointments 
+    const weekCount = appointments.filter(a => a.date >= weekStartStr).length;
     setWeekAppointments(weekCount);
+    
+    // Pending appointments
+    const pendingCount = appointments.filter(a => a.status === 'pending').length;
     setPendingAppointments(pendingCount);
+    
+    // Completed appointments
+    const completedCount = appointments.filter(a => a.status === 'completed').length;
     setCompletedAppointments(completedCount);
-    setUpcomingAppointments(getUpcomingAppointments());
-  }, []);
+    
+  }, [appointments]);
   
   // Handle marking appointment as completed
   const handleCompleteAppointment = () => {
     if (!selectedAppointment) return;
     
+    setCompletionDialogVisible(false);
+    setMenuVisible(false);
+    
     // Find the appointment in the mock data
-    const index = MOCK_APPOINTMENTS.findIndex(a => a.id === selectedAppointment.id);
+    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
     if (index !== -1) {
-      // Update the status
-      MOCK_APPOINTMENTS[index].status = 'completed';
-      // Add remarks if provided
-      if (completionRemarks) {
-        MOCK_APPOINTMENTS[index].notes = completionRemarks;
-      }
-      
-      // Update the displayed appointments
-      setUpcomingAppointments(getUpcomingAppointments());
+      // Update the status with remarks if provided
+      updateAppointmentStatus(selectedAppointment.id, 'completed', completionRemarks || undefined);
       
       // Update statistics
-      const completedCount = MOCK_APPOINTMENTS.filter(a => a.status === 'completed').length;
+      const completedCount = appointments.filter(a => a.status === 'completed').length;
       setCompletedAppointments(completedCount);
       
       // Decrease pending if it was pending
       if (selectedAppointment.status === 'pending') {
-        const pendingCount = MOCK_APPOINTMENTS.filter(a => a.status === 'pending').length;
+        const pendingCount = appointments.filter(a => a.status === 'pending').length;
         setPendingAppointments(pendingCount);
       }
       
-      // Reset state
-      setCompletionDialogVisible(false);
+      // Reset the form
       setCompletionRemarks('');
       setSelectedAppointment(null);
     }
@@ -100,44 +93,42 @@ export default function HomeScreen() {
   const handleConfirmAppointment = () => {
     if (!selectedAppointment) return;
     
+    setConfirmDialogVisible(false);
+    setMenuVisible(false);
+    
     // Find the appointment in the mock data
-    const index = MOCK_APPOINTMENTS.findIndex(a => a.id === selectedAppointment.id);
-    if (index !== -1 && MOCK_APPOINTMENTS[index].status === 'pending') {
+    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
+    if (index !== -1 && appointments[index].status === 'pending') {
       // Update the status
-      MOCK_APPOINTMENTS[index].status = 'confirmed';
-      
-      // Update the displayed appointments
-      setUpcomingAppointments(getUpcomingAppointments());
+      updateAppointmentStatus(selectedAppointment.id, 'confirmed');
       
       // Update statistics
-      const pendingCount = MOCK_APPOINTMENTS.filter(a => a.status === 'pending').length;
+      const pendingCount = appointments.filter(a => a.status === 'pending').length;
       setPendingAppointments(pendingCount);
       
-      // Reset state
-      setConfirmDialogVisible(false);
+      // Reset the selected appointment
       setSelectedAppointment(null);
     }
   };
   
-  // Handle cancelling an appointment
+  // Handle cancelling a pending appointment
   const handleCancelAppointment = () => {
     if (!selectedAppointment) return;
     
+    setCancelDialogVisible(false);
+    setMenuVisible(false);
+    
     // Find the appointment in the mock data
-    const index = MOCK_APPOINTMENTS.findIndex(a => a.id === selectedAppointment.id);
-    if (index !== -1 && MOCK_APPOINTMENTS[index].status === 'pending') {
+    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
+    if (index !== -1 && appointments[index].status === 'pending') {
       // Update the status
-      MOCK_APPOINTMENTS[index].status = 'cancelled';
-      
-      // Update the displayed appointments
-      setUpcomingAppointments(getUpcomingAppointments());
+      updateAppointmentStatus(selectedAppointment.id, 'cancelled');
       
       // Update statistics
-      const pendingCount = MOCK_APPOINTMENTS.filter(a => a.status === 'pending').length;
+      const pendingCount = appointments.filter(a => a.status === 'pending').length;
       setPendingAppointments(pendingCount);
       
-      // Reset state
-      setCancelDialogVisible(false);
+      // Reset the selected appointment
       setSelectedAppointment(null);
     }
   };
@@ -357,14 +348,14 @@ export default function HomeScreen() {
           <Card.Content style={styles.statsContent}>
             <View style={styles.statsRow}>
               <View style={styles.statBlock}>
-                <ThemedText style={styles.statPercentage}>{Math.round((pendingAppointments/MOCK_APPOINTMENTS.length)*100)}%</ThemedText>
+                <ThemedText style={styles.statPercentage}>{Math.round((pendingAppointments/appointments.length)*100)}%</ThemedText>
                 <ThemedText style={styles.statLabel}>Pending</ThemedText>
-                <ProgressBar progress={pendingAppointments/MOCK_APPOINTMENTS.length} color="#FF9800" style={styles.progressBar} />
+                <ProgressBar progress={pendingAppointments/appointments.length} color="#FF9800" style={styles.progressBar} />
               </View>
               <View style={styles.statBlock}>
-                <ThemedText style={styles.statPercentage}>{Math.round((completedAppointments/MOCK_APPOINTMENTS.length)*100)}%</ThemedText>
+                <ThemedText style={styles.statPercentage}>{Math.round((completedAppointments/appointments.length)*100)}%</ThemedText>
                 <ThemedText style={styles.statLabel}>Completed</ThemedText>
-                <ProgressBar progress={completedAppointments/MOCK_APPOINTMENTS.length} color="#4CAF50" style={styles.progressBar} />
+                <ProgressBar progress={completedAppointments/appointments.length} color="#4CAF50" style={styles.progressBar} />
               </View>
             </View>
           </Card.Content>

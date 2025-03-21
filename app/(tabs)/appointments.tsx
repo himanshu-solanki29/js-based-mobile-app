@@ -32,13 +32,12 @@ import {
   Menu
 } from 'react-native-paper';
 import { 
-  MOCK_APPOINTMENTS, 
   Appointment, 
   AppointmentStatus, 
   getPatientName,
   addAppointment,
-  sortAppointmentsByDateDesc,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  useAppointments
 } from '@/utils/appointmentStore';
 import { getPatientById } from '@/utils/patientStore';
 
@@ -46,6 +45,7 @@ export default function AppointmentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const theme = useTheme();
+  const { appointments, upcomingAppointments, pastAppointments } = useAppointments();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{start: string | null, end: string | null}>({start: null, end: null});
@@ -111,12 +111,12 @@ export default function AppointmentsScreen() {
   
   // Initialize with sorted appointments
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>(
-    sortAppointmentsByDateDesc(MOCK_APPOINTMENTS.filter(apt => apt.status === 'confirmed'))
+    sortAppointmentsByDateDesc(appointments.filter(apt => apt.status === 'confirmed'))
   );
   
   // Filter appointments based on search query, selected date/range, and status
   useEffect(() => {
-    let filtered = [...MOCK_APPOINTMENTS];
+    let filtered = [...appointments];
     
     // Filter by search query
     if (searchQuery.trim() !== '') {
@@ -687,25 +687,27 @@ export default function AppointmentsScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    // Use the appointmentStore to add the appointment
+    // Create new appointment
     const newAppointment = addAppointment({
       date: appointmentData.date,
       time: appointmentData.time,
       reason: appointmentData.reason,
-      notes: appointmentData.notes,
+      notes: appointmentData.notes || '',
       patientId: appointmentData.patientId,
-      status: 'pending'
+      status: 'confirmed'
     });
     
-    // If the status matches our filter, add it to the filtered list
-    if (selectedStatus === 'all' || selectedStatus === newAppointment.status) {
-      const updatedAppointments = [...filteredAppointments, newAppointment];
-      setFilteredAppointments(sortAppointmentsByDateDesc(updatedAppointments));
-    }
+    // No need to manually update the state here - the useAppointments hook will handle it
+    setSchedulerVisible(false);
+    setScheduleSuccess(true);
     
-    // Show toast notification
-    alert(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`);
+    setTimeout(() => {
+      setScheduleSuccess(false);
+    }, 3000);
   };
+
+  // Add after other state variables
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
 
   return (
     <ThemedView style={styles.container}>

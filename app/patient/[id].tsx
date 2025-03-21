@@ -1,21 +1,21 @@
-import { StyleSheet, ScrollView, TouchableOpacity, View } from "react-native";
+import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { Button, Text, Card, Badge, Surface, Divider } from 'react-native-paper';
-import { useState } from "react";
+import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton } from 'react-native-paper';
+import { useState, useEffect } from "react";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { getPatientById } from "@/utils/patientStore";
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { 
-  addAppointment,
-  sortAppointmentsByDateDesc,
   getPatientAppointments,
+  addAppointment, 
   Appointment
 } from '@/utils/appointmentStore';
+import { MedicalRecord } from '@/utils/types';
 
 // Mock appointment data used across the app
 // In a real app this would be in a central store/context
@@ -442,39 +442,54 @@ export default function PatientDetailsScreen() {
                 </ThemedText>
               </View>
             ) : (
-              patient.visits.map((visit, index) => (
-                <View key={index}>
-                  {index > 0 && <Divider style={styles.visitDivider} />}
-                  <View style={styles.visitItem}>
-                    <View style={styles.visitHeader}>
-                      <ThemedText style={styles.visitDate}>
-                        <FontAwesome5 name="calendar-day" size={14} color="#4CAF50" /> {formatDate(visit.date)}
-                      </ThemedText>
-                    </View>
-                    
-                    <View style={styles.visitInfoRow}>
-                      <ThemedText style={styles.visitLabel}>Complaint:</ThemedText>
-                      <ThemedText style={styles.visitValue}>{visit.complaint}</ThemedText>
-                    </View>
-                    <View style={styles.visitInfoRow}>
-                      <ThemedText style={styles.visitLabel}>Diagnosis:</ThemedText>
-                      <ThemedText style={styles.visitValue}>{visit.diagnosis}</ThemedText>
-                    </View>
-                    <View style={styles.visitInfoRow}>
-                      <ThemedText style={styles.visitLabel}>Blood Pressure:</ThemedText>
-                      <ThemedText style={styles.visitValue}>{visit.bloodPressure}</ThemedText>
-                    </View>
-                    <View style={styles.visitInfoRow}>
-                      <ThemedText style={styles.visitLabel}>Weight:</ThemedText>
-                      <ThemedText style={styles.visitValue}>{visit.weight}</ThemedText>
-                    </View>
-                    <View style={styles.visitInfoRow}>
-                      <ThemedText style={styles.visitLabel}>Prescription:</ThemedText>
-                      <ThemedText style={styles.visitValue}>{visit.prescription}</ThemedText>
+              patient.visits.map((visit, index) => {
+                // Ensure all fields are available by providing defaults if any field is missing
+                const medicalRecord: MedicalRecord = {
+                  complaint: visit.complaint || 'Not recorded',
+                  diagnosis: visit.diagnosis || 'Not recorded',
+                  bloodPressure: visit.bloodPressure || 'Not recorded',
+                  weight: visit.weight || 'Not recorded',
+                  prescription: visit.prescription || 'Not recorded'
+                };
+                
+                return (
+                  <View key={index}>
+                    {index > 0 && <Divider style={styles.visitDivider} />}
+                    <View style={styles.visitItem}>
+                      <View style={styles.visitHeader}>
+                        <ThemedText style={styles.visitDate}>
+                          <FontAwesome5 name="calendar-day" size={14} color="#4CAF50" /> {formatDate(visit.date)}
+                        </ThemedText>
+                      </View>
+                      
+                      <View style={styles.visitInfoRow}>
+                        <ThemedText style={styles.visitLabel}>Complaint:</ThemedText>
+                        <ThemedText style={styles.visitValue}>{medicalRecord.complaint}</ThemedText>
+                      </View>
+                      
+                      <View style={styles.visitInfoRow}>
+                        <ThemedText style={styles.visitLabel}>Diagnosis:</ThemedText>
+                        <ThemedText style={styles.visitValue}>{medicalRecord.diagnosis}</ThemedText>
+                      </View>
+                      
+                      <View style={styles.visitInfoRow}>
+                        <ThemedText style={styles.visitLabel}>Blood Pressure:</ThemedText>
+                        <ThemedText style={styles.visitValue}>{medicalRecord.bloodPressure}</ThemedText>
+                      </View>
+                      
+                      <View style={styles.visitInfoRow}>
+                        <ThemedText style={styles.visitLabel}>Weight:</ThemedText>
+                        <ThemedText style={styles.visitValue}>{medicalRecord.weight}</ThemedText>
+                      </View>
+                      
+                      <View style={styles.visitInfoRow}>
+                        <ThemedText style={styles.visitLabel}>Prescription:</ThemedText>
+                        <ThemedText style={styles.visitValue}>{medicalRecord.prescription}</ThemedText>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         </Surface>

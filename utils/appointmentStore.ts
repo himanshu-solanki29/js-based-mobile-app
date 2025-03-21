@@ -1,8 +1,20 @@
 import { getPatientById, updatePatient } from '@/utils/patientStore';
+import { AppointmentStatus } from './types';
+import { useState, useEffect } from 'react';
+
+// Re-export the AppointmentStatus type
+export { AppointmentStatus };
+
+// Define MedicalRecord interface locally to avoid import issues
+interface MedicalRecord {
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+}
 
 // Define appointment types
-export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed';
-
 export type Appointment = {
   id: string;
   patientId: string;
@@ -12,6 +24,7 @@ export type Appointment = {
   reason: string;
   status: AppointmentStatus;
   notes?: string; // Optional notes property
+  medicalRecord?: MedicalRecord; // Optional medical record for completed appointments
 };
 
 // Mock appointment data - shared between components
@@ -81,6 +94,14 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
   },
 ];
 
+// Track listeners for appointment changes
+let listenerCallbacks: (() => void)[] = [];
+
+// Notify all listeners when appointments change
+const notifyListeners = () => {
+  listenerCallbacks.forEach(callback => callback());
+};
+
 // Helper function to get the patient name from the patient store
 export const getPatientName = (patientId: string): string => {
   const patient = getPatientById(patientId);
@@ -110,6 +131,9 @@ export const addAppointment = (appointmentData: {
 
   // Add the appointment to our mock database
   MOCK_APPOINTMENTS.push(newAppointment);
+  
+  // Notify listeners about the change
+  notifyListeners();
   
   return newAppointment;
 };
@@ -188,33 +212,34 @@ export const updateAppointmentStatus = (
     const patient = getPatientById(appointment.patientId);
     if (patient) {
       // Extract medical information from notes if provided
-      let diagnosis = '';
-      let bloodPressure = patient.bloodPressure || 'Not measured';
-      let weight = patient.weight || 'Not measured';
-      let prescription = 'No prescription recorded';
+      const medicalRecord: MedicalRecord = {
+        complaint: appointment.reason,
+        diagnosis: 'No diagnosis recorded',
+        bloodPressure: patient.bloodPressure || 'Not measured',
+        weight: patient.weight || 'Not measured',
+        prescription: 'No prescription recorded'
+      };
       
       if (remarks) {
         // Parse medical information from notes
-        // Expected format from medical form: "Diagnosis: <value>\nBlood Pressure: <value>\nWeight: <value>\nPrescription: <value>"
+        // Expected format from medical form: "Complaint: <value>\nDiagnosis: <value>\nBlood Pressure: <value>\nWeight: <value>\nPrescription: <value>"
+        const complaintMatch = remarks.match(/Complaint:\s*([^\n]+)/);
         const diagnosisMatch = remarks.match(/Diagnosis:\s*([^\n]+)/);
         const bpMatch = remarks.match(/Blood Pressure:\s*([^\n]+)/);
         const weightMatch = remarks.match(/Weight:\s*([^\n]+)/);
         const prescriptionMatch = remarks.match(/Prescription:\s*([^\n]+)/);
         
-        if (diagnosisMatch) diagnosis = diagnosisMatch[1];
-        if (bpMatch) bloodPressure = bpMatch[1];
-        if (weightMatch) weight = weightMatch[1];
-        if (prescriptionMatch) prescription = prescriptionMatch[1];
+        if (complaintMatch) medicalRecord.complaint = complaintMatch[1];
+        if (diagnosisMatch) medicalRecord.diagnosis = diagnosisMatch[1];
+        if (bpMatch) medicalRecord.bloodPressure = bpMatch[1];
+        if (weightMatch) medicalRecord.weight = weightMatch[1];
+        if (prescriptionMatch) medicalRecord.prescription = prescriptionMatch[1];
       }
       
       // Create a new visit entry
       const newVisit = {
         date: appointment.date,
-        complaint: appointment.reason,
-        diagnosis: diagnosis || remarks || 'No diagnosis recorded',
-        bloodPressure,
-        weight,
-        prescription
+        ...medicalRecord
       };
       
       // Also update the patient's current vitals if provided
@@ -224,12 +249,12 @@ export const updateAppointmentStatus = (
       };
       
       // Only update these if they actually have values from the form
-      if (bloodPressure && bloodPressure !== 'Not measured' && bloodPressure !== 'Not recorded') {
-        patientUpdates.bloodPressure = bloodPressure;
+      if (medicalRecord.bloodPressure && medicalRecord.bloodPressure !== 'Not measured' && medicalRecord.bloodPressure !== 'Not recorded') {
+        patientUpdates.bloodPressure = medicalRecord.bloodPressure;
       }
       
-      if (weight && weight !== 'Not measured' && weight !== 'Not recorded') {
-        patientUpdates.weight = weight;
+      if (medicalRecord.weight && medicalRecord.weight !== 'Not measured' && medicalRecord.weight !== 'Not recorded') {
+        patientUpdates.weight = medicalRecord.weight;
       }
       
       // Update the patient with the new visit and potentially new vitals
@@ -237,10 +262,40 @@ export const updateAppointmentStatus = (
     }
   }
   
+  // Notify listeners about the change
+  notifyListeners();
+  
   return appointment;
 };
 
 // Function to get appointments for a specific patient
 export const getPatientAppointments = (patientId: string): Appointment[] => {
   return MOCK_APPOINTMENTS.filter(appointment => appointment.patientId === patientId);
+};
+
+// Hook to subscribe to appointment data changes
+export const useAppointments = () => {
+  const [appointments, setAppointments] = useState<Appointment[]>([...MOCK_APPOINTMENTS]);
+  
+  useEffect(() => {
+    const handleChange = () => {
+      setAppointments([...MOCK_APPOINTMENTS]);
+    };
+    
+    listenerCallbacks.push(handleChange);
+    
+    return () => {
+      listenerCallbacks = listenerCallbacks.filter(cb => cb !== handleChange);
+    };
+  }, []);
+  
+  return {
+    appointments,
+    upcomingAppointments: sortAppointmentsByDate(
+      appointments.filter(a => a.status === 'confirmed' || a.status === 'pending')
+    ),
+    pastAppointments: sortAppointmentsByDateDesc(
+      appointments.filter(a => a.status === 'completed' || a.status === 'cancelled')
+    )
+  };
 }; 

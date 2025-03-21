@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 
-// Define types for visits and patient data
-export type Visit = {
-  date: string;    // Date from completed appointment
+// Define MedicalRecord interface locally to avoid import issues
+interface MedicalRecord {
   complaint: string;
   diagnosis: string;
   bloodPressure: string;
   weight: string;
   prescription: string;
+}
+
+// Define types for visits and patient data
+export type Visit = MedicalRecord & {
+  date: string;    // Date from completed appointment
 };
 
 export type Patient = {
