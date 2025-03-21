@@ -10,7 +10,7 @@ import {
   Divider,
   TouchableRipple,
   Portal,
-  Dialog,
+  Modal,
   Card,
   Appbar,
   Surface,
@@ -22,6 +22,7 @@ import {
 } from 'react-native-paper';
 import { usePatients, Patient } from '@/utils/patientStore';
 import { addAppointment } from '@/utils/appointmentStore';
+import { ThemedText } from '@/components/ThemedText';
 
 interface AppointmentSchedulerProps {
   isVisible: boolean;
@@ -46,6 +47,8 @@ export function AppointmentScheduler({
   patientId
 }: AppointmentSchedulerProps) {
   const theme = useTheme();
+  const primaryColor = theme.colors.primary;
+  
   const { patientsArray } = usePatients();
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -250,32 +253,38 @@ export function AppointmentScheduler({
     setSelectedPatient(patient);
     setShowPatientPicker(false);
   };
-
-  // Calendar UI
+  
   const renderCalendar = () => (
-    <Calendar
-      onDayPress={handleDateSelect}
-      markedDates={{
-        [date.toISOString().split('T')[0]]: { selected: true, selectedColor: '#4CAF50' }
-      }}
-      minDate={new Date().toISOString().split('T')[0]}
-      theme={{
-        calendarBackground: '#ffffff',
-        textSectionTitleColor: '#555555',
-        selectedDayBackgroundColor: '#4CAF50',
-        selectedDayTextColor: '#ffffff',
-        todayTextColor: '#4CAF50',
-        dayTextColor: '#333333',
-        textDisabledColor: '#cccccc',
-        arrowColor: '#4CAF50',
-        monthTextColor: '#2e7d32',
-        indicatorColor: '#4CAF50',
-        dotColor: '#4CAF50'
-      }}
-    />
+    <Portal>
+      <Modal visible={showDatePicker} onDismiss={() => setShowDatePicker(false)} contentContainerStyle={styles.modalContainer}>
+        <View style={styles.header}>
+          <ThemedText style={styles.title}>Select Date</ThemedText>
+        </View>
+        <Calendar 
+          onDayPress={handleDateSelect}
+          markedDates={{
+            [date.toISOString().split('T')[0]]: {selected: true, selectedColor: primaryColor}
+          }}
+          theme={{
+            selectedDayBackgroundColor: primaryColor,
+            todayTextColor: primaryColor,
+            arrowColor: primaryColor,
+          }}
+        />
+        <View style={styles.actions}>
+          <Button 
+            mode="outlined" 
+            onPress={() => setShowDatePicker(false)}
+            style={styles.cancelButton}
+            textColor="#757575"
+          >
+            Cancel
+          </Button>
+        </View>
+      </Modal>
+    </Portal>
   );
-
-  // Save selected time when clicking check button
+  
   const handleSaveTime = () => {
     setSelectedHour(tempHour);
     setSelectedMinute(tempMinute);
@@ -283,502 +292,464 @@ export function AppointmentScheduler({
     setShowTimePicker(false);
   };
   
-  // Cancel time changes
   const handleCancelTime = () => {
     setShowTimePicker(false);
   };
-
-  // Generate time selector UI
-  const renderTimeSelector = () => {
-    return (
-      <View style={styles.timeSelector}>
-        <View style={styles.timeSelectorRow}>
-          {/* Hour Selector */}
-          <View style={styles.timePickerColumn}>
-            <Text style={[styles.timePickerLabel, { color: '#2e7d32' }]}>Hour</Text>
-            <ScrollView 
-              ref={hourScrollViewRef}
-              style={[styles.timeScrollView, { height: 160 }]} 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 60 }}
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(hour => (
-                <TouchableRipple
-                  key={`hour-${hour}`}
-                  style={[
-                    styles.timeOption,
-                    tempHour === hour && [styles.selectedTimeOption, {backgroundColor: '#4CAF50'}]
-                  ]}
-                  onPress={() => {
-                    setTempHour(hour);
-                    scrollToSelected(hourScrollViewRef, hour - 1, 48);
-                  }}
-                  rippleColor="rgba(46, 125, 50, 0.16)"
-                >
-                  <Text style={[
-                    { fontSize: 16 },
-                    tempHour === hour ? styles.selectedTimeText : { color: '#2e7d32' }
-                  ]}>
-                    {hour}
-                  </Text>
-                </TouchableRipple>
-              ))}
-            </ScrollView>
-          </View>
-
-          <Text style={[styles.timeSeparator, { color: '#2e7d32' }]}>:</Text>
-          
-          {/* Minute Selector */}
-          <View style={styles.timePickerColumn}>
-            <Text style={[styles.timePickerLabel, { color: '#2e7d32' }]}>Minute</Text>
-            <ScrollView 
-              ref={minuteScrollViewRef}
-              style={[styles.timeScrollView, { height: 160 }]} 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 60 }}
-            >
-              {Array.from({ length: 12 }, (_, i) => i * 5).map(minute => (
-                <TouchableRipple
-                  key={`minute-${minute}`}
-                  style={[
-                    styles.timeOption,
-                    tempMinute === minute && [styles.selectedTimeOption, {backgroundColor: '#4CAF50'}]
-                  ]}
-                  onPress={() => {
-                    setTempMinute(minute);
-                    scrollToSelected(minuteScrollViewRef, minute / 5, 48);
-                  }}
-                  rippleColor="rgba(46, 125, 50, 0.16)"
-                >
-                  <Text style={[
-                    { fontSize: 16 },
-                    tempMinute === minute ? styles.selectedTimeText : { color: '#2e7d32' }
-                  ]}>
-                    {minute.toString().padStart(2, '0')}
-                  </Text>
-                </TouchableRipple>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* AM/PM Selector */}
-          <View style={styles.timePickerColumn}>
-            <Text style={[styles.timePickerLabel, { color: '#2e7d32' }]}>AM/PM</Text>
-            <ScrollView
-              ref={amPmScrollViewRef}
-              style={[styles.timeScrollView, { height: 160 }]}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 60 }}
-            >
-              {['AM', 'PM'].map((period, index) => (
-                <TouchableRipple
-                  key={`period-${period}`}
-                  style={[
-                    styles.timeOption,
-                    tempAmPm === period && [styles.selectedTimeOption, {backgroundColor: '#4CAF50'}]
-                  ]}
-                  onPress={() => {
-                    setTempAmPm(period);
-                    scrollToSelected(amPmScrollViewRef, index, 48);
-                  }}
-                  rippleColor="rgba(46, 125, 50, 0.16)"
-                >
-                  <Text style={[
-                    { fontSize: 16 },
-                    tempAmPm === period ? styles.selectedTimeText : { color: '#2e7d32' }
-                  ]}>
-                    {period}
-                  </Text>
-                </TouchableRipple>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </View>
-    );
-  };
   
-  // Patient selector UI
-  const renderPatientItem = ({ item }: { item: Patient }) => (
-    <List.Item
-      title={item.name}
-      titleStyle={{ fontWeight: '500', fontSize: 16, color: '#333333' }}
-      description={`Age: ${item.age} • Phone: ${item.phone}`}
-      descriptionStyle={{ fontSize: 14, color: '#666666' }}
-      left={props => <Avatar.Icon {...props} icon="account" style={{ backgroundColor: '#4CAF50', marginLeft: 12 }} />}
-      onPress={() => handlePatientSelect(item)}
-      style={[
-        styles.patientItem,
-        selectedPatient?.id === item.id && { backgroundColor: '#e8f5e9' }
-      ]}
-      rippleColor="rgba(46, 125, 50, 0.1)"
-    />
-  );
-
-  return (
-    <Portal>
-      <Dialog
-      visible={isVisible}
-        onDismiss={onClose}
-        style={{ 
-          backgroundColor: '#f5f5f5',
-          borderRadius: 10,
-          maxWidth: 500,
-          alignSelf: 'center',
-          width: '90%',
-          maxHeight: '85%',
-          padding: 0,
-          margin: 0,
-          overflow: 'hidden'
-        }}
-      >
-        <Appbar.Header style={{ backgroundColor: '#4CAF50', borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
-          <Appbar.Content 
-            title={selectedPatient ? `Schedule for ${selectedPatient.name}` : "Schedule Appointment"} 
-            titleStyle={{ color: 'white', fontSize: 18 }}
-          />
-          <Appbar.Action icon="close" color="white" onPress={onClose} />
-        </Appbar.Header>
-
-        <ScrollView style={{ flexGrow: 1 }}>
-          <View style={styles.formContainer}>
-            {/* Patient Selection */}
-            <View style={styles.formGroup}>
-              <Text variant="titleMedium" style={{ color: '#2e7d32', marginBottom: 8 }}>Patient</Text>
-              <TouchableRipple
-                style={[styles.datePickerButton, { borderColor: '#2e7d32', borderWidth: 1 }]}
-                onPress={() => setShowPatientPicker(true)}
-                rippleColor="rgba(46, 125, 50, 0.16)"
-                disabled={!!patientId} // Disable if patientId is provided
-              >
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="user" size={16} color="#2e7d32" style={styles.inputIcon} />
-                  <Text style={{ color: '#33691e', fontSize: 16 }}>
-                    {selectedPatient ? selectedPatient.name : 'Select Patient'}
-                  </Text>
-                </View>
-              </TouchableRipple>
+  const renderTimeSelector = () => {
+    // Generate arrays for hours, minutes, and AM/PM
+    const hours = Array.from({length: 12}, (_, i) => i + 1);
+    const minutes = Array.from({length: 12}, (_, i) => i * 5);
+    const ampm = ['AM', 'PM'];
+    
+    const renderTimeItem = (value: number | string, isSelected: boolean, type: 'hour' | 'minute' | 'ampm') => {
+      const displayValue = type === 'minute' ? value.toString().padStart(2, '0') : value;
+      return (
+        <TouchableRipple
+          key={value.toString()}
+          style={[
+            styles.timeItem,
+            isSelected && { backgroundColor: primaryColor + '20' }
+          ]}
+          onPress={() => {
+            if (type === 'hour') setTempHour(value as number);
+            else if (type === 'minute') setTempMinute(value as number);
+            else setTempAmPm(value as string);
+          }}
+        >
+          <ThemedText style={[
+            styles.timeItemText,
+            isSelected && { color: primaryColor, fontWeight: 'bold' }
+          ]}>
+            {displayValue}
+          </ThemedText>
+        </TouchableRipple>
+      );
+    };
+    
+    return (
+      <Portal>
+        <Modal visible={showTimePicker} onDismiss={handleCancelTime} contentContainerStyle={styles.modalContainer}>
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>Select Time</ThemedText>
           </View>
-
-          <View style={styles.formGroup}>
-              <Text variant="titleMedium" style={{ color: '#2e7d32', marginBottom: 8 }}>Date</Text>
-              <TouchableRipple
-                style={[styles.datePickerButton, { borderColor: '#2e7d32', borderWidth: 1 }]}
-              onPress={() => setShowDatePicker(true)}
-                rippleColor="rgba(46, 125, 50, 0.16)"
+          
+          <View style={styles.timePickerContainer}>
+            <View style={styles.timePickerWrapper}>
+              <ThemedText style={styles.timePickerLabel}>Hour</ThemedText>
+              <ScrollView
+                ref={hourScrollViewRef}
+                showsVerticalScrollIndicator={false}
+                style={styles.timePickerColumn}
               >
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="calendar-alt" size={16} color="#2e7d32" style={styles.inputIcon} />
-                  <Text style={{ color: '#33691e', fontSize: 16 }}>{date.toLocaleDateString()}</Text>
-                </View>
-              </TouchableRipple>
+                {hours.map(hour => renderTimeItem(hour, hour === tempHour, 'hour'))}
+              </ScrollView>
             </View>
-
-            <View style={styles.formGroup}>
-              <Text variant="titleMedium" style={{ color: '#2e7d32', marginBottom: 8 }}>Time</Text>
-              <TouchableRipple
-                style={[styles.datePickerButton, { borderColor: '#2e7d32', borderWidth: 1 }]}
-                onPress={() => setShowTimePicker(true)}
-                rippleColor="rgba(46, 125, 50, 0.16)"
+            
+            <View style={styles.timePickerWrapper}>
+              <ThemedText style={styles.timePickerLabel}>Minute</ThemedText>
+              <ScrollView
+                ref={minuteScrollViewRef}
+                showsVerticalScrollIndicator={false}
+                style={styles.timePickerColumn}
               >
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="clock" size={16} color="#2e7d32" style={styles.inputIcon} />
-                  <Text style={{ color: '#33691e', fontSize: 16 }}>{formatTime(selectedHour, selectedMinute, selectedAmPm)}</Text>
-                </View>
-              </TouchableRipple>
-          </View>
-
-          <View style={styles.formGroup}>
-              <Text variant="titleMedium" style={{ color: '#2e7d32', marginBottom: 8 }}>Reason</Text>
-            <TextInput
-                mode="outlined"
-              value={reason}
-              onChangeText={setReason}
-                placeholder="Enter reason for appointment"
-                style={styles.input}
-                outlineColor="#2e7d32"
-                activeOutlineColor="#4CAF50"
-                theme={{ colors: { primary: '#4CAF50', background: '#f5f5f5' } }}
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-              <Text variant="titleMedium" style={{ color: '#2e7d32', marginBottom: 8 }}>Notes</Text>
-            <TextInput
-                mode="outlined"
-              value={notes}
-              onChangeText={setNotes}
-                placeholder="Add any additional notes"
-              multiline
-              numberOfLines={4}
-                style={styles.textArea}
-                outlineColor="#2e7d32"
-                activeOutlineColor="#4CAF50"
-                theme={{ colors: { primary: '#4CAF50', background: '#f5f5f5' } }}
-            />
+                {minutes.map(minute => renderTimeItem(minute, minute === tempMinute, 'minute'))}
+              </ScrollView>
+            </View>
+            
+            <View style={styles.timePickerWrapper}>
+              <ThemedText style={styles.timePickerLabel}>AM/PM</ThemedText>
+              <ScrollView
+                ref={amPmScrollViewRef}
+                showsVerticalScrollIndicator={false}
+                style={styles.timePickerColumn}
+              >
+                {ampm.map(ap => renderTimeItem(ap, ap === tempAmPm, 'ampm'))}
+              </ScrollView>
             </View>
           </View>
-
-          <Surface style={[styles.actionContainer, { borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }]} elevation={0}>
+          
+          <View style={styles.actions}>
             <Button 
               mode="outlined" 
-              onPress={onClose}
-              style={[styles.button, { borderColor: '#2e7d32' }]}
-              textColor="#2e7d32"
+              onPress={handleCancelTime}
+              style={styles.cancelButton}
+              textColor="#757575"
             >
               Cancel
             </Button>
             <Button 
               mode="contained" 
-            onPress={handleSchedule}
-              style={styles.button}
-              buttonColor="#4CAF50"
+              onPress={handleSaveTime}
+              style={styles.submitButton}
+              buttonColor={primaryColor}
               textColor="#ffffff"
-              disabled={!reason.trim() || !selectedPatient}
             >
-              Schedule
+              Save
             </Button>
-          </Surface>
-        </ScrollView>
-      </Dialog>
-
-      <Dialog
-        visible={showDatePicker}
-        onDismiss={() => setShowDatePicker(false)}
-        style={{ 
-          backgroundColor: '#ffffff',
-          borderRadius: 10,
-          alignSelf: 'center',
-          width: isSmallScreen ? '95%' : 360,
-          padding: 0,
-          overflow: 'hidden'
-        }}
-      >
-        <Appbar.Header style={{ backgroundColor: '#4CAF50', height: 56 }}>
-          <Appbar.BackAction color="white" onPress={() => setShowDatePicker(false)} />
-          <Appbar.Content 
-            title="Select Date" 
-            titleStyle={{ color: 'white', fontSize: 18 }}
-          />
-          <Appbar.Action icon="check" color="white" onPress={() => setShowDatePicker(false)} />
-        </Appbar.Header>
-        <Dialog.Content style={{ padding: 0 }}>
-          {renderCalendar()}
-        </Dialog.Content>
-      </Dialog>
-
-      <Dialog
-        visible={showTimePicker}
-        onDismiss={handleCancelTime}
-        style={{ 
-          backgroundColor: '#ffffff',
-          borderRadius: 10,
-          alignSelf: 'center',
-          width: isSmallScreen ? '95%' : 360,
-          padding: 0,
-          overflow: 'hidden'
-        }}
-      >
-        <Appbar.Header style={{ backgroundColor: '#4CAF50', height: 56 }}>
-          <Appbar.BackAction color="white" onPress={handleCancelTime} />
-          <Appbar.Content 
-            title="Select Time" 
-            titleStyle={{ color: 'white', fontSize: 18 }}
-          />
-          <Appbar.Action icon="check" color="white" onPress={handleSaveTime} />
-        </Appbar.Header>
-        <Dialog.Content style={{ padding: 16 }}>
-          <View style={styles.timeSelectorContainer}>
-            {renderTimeSelector()}
-            <View style={styles.centerIndicator} />
           </View>
-        </Dialog.Content>
-      </Dialog>
-      
-      {/* Patient Selector Dialog */}
-      <Dialog
-        visible={showPatientPicker}
-        onDismiss={() => setShowPatientPicker(false)}
-        style={{ 
-          backgroundColor: '#ffffff',
-          borderRadius: 10,
-          alignSelf: 'center',
-          width: '90%',
-          maxWidth: 480,
-          maxHeight: '80%',
-          padding: 0,
-          overflow: 'hidden'
-        }}
-      >
-        <Appbar.Header style={{ backgroundColor: '#4CAF50', height: 56 }}>
-          <Appbar.BackAction color="white" onPress={() => setShowPatientPicker(false)} />
-          <Appbar.Content 
-            title="Select Patient" 
-            titleStyle={{ color: 'white', fontSize: 18 }}
+        </Modal>
+      </Portal>
+    );
+  };
+  
+  const renderPatientItem = ({ item }: { item: Patient }) => (
+    <TouchableRipple onPress={() => handlePatientSelect(item)}>
+      <List.Item
+        title={item.name}
+        description={`Phone: ${item.phone}`}
+        left={props => (
+          <Avatar.Text 
+            size={40} 
+            label={item.name.substring(0, 2).toUpperCase()} 
+            style={[props.style, {backgroundColor: primaryColor}]}
           />
-        </Appbar.Header>
-        <View style={{ padding: 16, paddingBottom: 8 }}>
-          <Text style={{ color: '#555555', marginBottom: 8, fontSize: 14 }}>
-            Search by name or phone number
-          </Text>
-          <Searchbar
-            placeholder="Search patients..."
-            onChangeText={setPatientSearch}
-            value={patientSearch}
-            style={{ 
-              backgroundColor: '#f5f5f5',
-              borderWidth: 1,
-              borderColor: '#2e7d32',
-              borderRadius: 8,
-              elevation: 0
-            }}
-            iconColor="#2e7d32"
-            theme={{ colors: { primary: '#2e7d32' }}}
-          />
+        )}
+        titleStyle={styles.patientItemTitle}
+        descriptionStyle={styles.patientItemDescription}
+      />
+    </TouchableRipple>
+  );
+  
+  const renderPatientPicker = () => (
+    <Portal>
+      <Modal visible={showPatientPicker} onDismiss={() => setShowPatientPicker(false)} contentContainerStyle={styles.modalContainer}>
+        <View style={styles.header}>
+          <ThemedText style={styles.title}>Select Patient</ThemedText>
         </View>
+        <Searchbar
+          placeholder="Search patients..."
+          onChangeText={text => setPatientSearch(text)}
+          value={patientSearch}
+          style={styles.searchBar}
+          iconColor={primaryColor}
+        />
         <FlatList
           data={filteredPatients}
           renderItem={renderPatientItem}
-          keyExtractor={(item) => item.id}
-          style={{ maxHeight: 400 }}
-          contentContainerStyle={{ paddingBottom: 16 }}
-          ListEmptyComponent={
-            <View style={styles.emptyPatientList}>
-              <FontAwesome5 name="search" size={24} color="#2e7d32" style={{ marginBottom: 8 }} />
-              <Text style={{ color: '#2e7d32', fontSize: 16, fontWeight: '500' }}>No patients found</Text>
-              <Text style={{ color: '#666666', textAlign: 'center', marginTop: 4 }}>
-                Try a different search term or add a new patient
-              </Text>
-      </View>
-          }
+          keyExtractor={item => item.id}
+          style={styles.patientList}
         />
-      </Dialog>
+        <View style={styles.actions}>
+          <Button 
+            mode="outlined" 
+            onPress={() => setShowPatientPicker(false)}
+            style={styles.cancelButton}
+            textColor="#757575"
+          >
+            Cancel
+          </Button>
+        </View>
+      </Modal>
+    </Portal>
+  );
+  
+  return (
+    <Portal>
+      <Modal visible={isVisible} onDismiss={onClose} contentContainerStyle={styles.modalContainer}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>Schedule Appointment</ThemedText>
+          </View>
+          
+          {/* Patient Section */}
+          <View style={styles.sectionHeader}>
+            <FontAwesome5 name="user" size={18} color={primaryColor} style={styles.sectionIcon} />
+            <ThemedText style={styles.sectionTitle}>Patient Information</ThemedText>
+          </View>
+          
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Patient <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+            <TouchableRipple
+              onPress={() => !patientId && setShowPatientPicker(true)}
+              disabled={!!patientId}
+              style={[
+                styles.patientSelector,
+                { borderColor: selectedPatient ? primaryColor : '#E0E0E0' }
+              ]}
+            >
+              <View style={styles.patientSelectorContent}>
+                {selectedPatient ? (
+                  <View style={styles.selectedPatientContainer}>
+                    <Avatar.Text 
+                      size={28} 
+                      label={selectedPatient.name.substring(0, 2).toUpperCase()} 
+                      style={{backgroundColor: primaryColor}}
+                    />
+                    <ThemedText style={styles.selectedPatientName}>{selectedPatient.name}</ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.placeholderText}>Select a patient</ThemedText>
+                )}
+                {!patientId && (
+                  <FontAwesome5 name="chevron-down" size={16} color="#757575" />
+                )}
+              </View>
+            </TouchableRipple>
+          </View>
+          
+          <Divider style={styles.sectionDivider} />
+          
+          {/* Appointment Details Section */}
+          <View style={styles.sectionHeader}>
+            <FontAwesome5 name="calendar-alt" size={18} color={primaryColor} style={styles.sectionIcon} />
+            <ThemedText style={styles.sectionTitle}>Appointment Details</ThemedText>
+          </View>
+          
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Date <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+            <TouchableRipple
+              onPress={() => setShowDatePicker(true)}
+              style={styles.dateSelector}
+            >
+              <View style={styles.dateSelectorContent}>
+                <FontAwesome5 name="calendar-alt" size={16} color={primaryColor} style={styles.dateIcon} />
+                <ThemedText>{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</ThemedText>
+                <FontAwesome5 name="chevron-down" size={16} color="#757575" />
+              </View>
+            </TouchableRipple>
+          </View>
+          
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Time <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+            <TouchableRipple
+              onPress={() => setShowTimePicker(true)}
+              style={styles.timeSelector}
+            >
+              <View style={styles.timeSelectorContent}>
+                <FontAwesome5 name="clock" size={16} color={primaryColor} style={styles.timeIcon} />
+                <ThemedText>{formatTime(selectedHour, selectedMinute, selectedAmPm)}</ThemedText>
+                <FontAwesome5 name="chevron-down" size={16} color="#757575" />
+              </View>
+            </TouchableRipple>
+          </View>
+          
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Reason <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+            <TextInput
+              mode="outlined"
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Reason for appointment"
+              style={styles.input}
+              outlineColor="#E0E0E0"
+              activeOutlineColor={primaryColor}
+              left={<TextInput.Icon icon={() => <FontAwesome5 name="clipboard" size={16} color={primaryColor} />} />}
+            />
+          </View>
+          
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Notes</ThemedText>
+            <TextInput
+              mode="outlined"
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Additional notes"
+              multiline
+              numberOfLines={4}
+              style={styles.textArea}
+              outlineColor="#E0E0E0"
+              activeOutlineColor={primaryColor}
+            />
+          </View>
+          
+          {/* Action Section */}
+          <View style={styles.actionSection}>
+            <ThemedText style={styles.note}><ThemedText style={styles.required}>*</ThemedText> Required fields</ThemedText>
+            
+            <View style={styles.actions}>
+              <Button 
+                mode="outlined" 
+                onPress={onClose}
+                style={styles.cancelButton}
+                textColor="#757575"
+              >
+                Cancel
+              </Button>
+              <Button 
+                mode="contained" 
+                onPress={handleSchedule}
+                style={styles.submitButton}
+                buttonColor={primaryColor}
+                textColor="#ffffff"
+              >
+                Schedule
+              </Button>
+            </View>
+          </View>
+        </ScrollView>
+        
+        {/* Render sub-dialogs */}
+        {renderCalendar()}
+        {renderTimeSelector()}
+        {renderPatientPicker()}
+      </Modal>
     </Portal>
   );
 }
 
 const styles = StyleSheet.create({
-  formContainer: {
+  modalContainer: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 16,
     padding: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 0,
+    maxHeight: '90%',
   },
-  formGroup: {
-    marginBottom: 20,
+  header: {
+    marginBottom: 16,
   },
-  inputContainer: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    marginBottom: 16,
   },
-  inputIcon: {
+  sectionIcon: {
     marginRight: 8,
   },
-  datePickerButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 50,
-    justifyContent: 'center',
-    backgroundColor: '#ebf7eb',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  sectionDivider: {
+    marginVertical: 20,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  required: {
+    color: '#F44336',
   },
   input: {
-    backgroundColor: '#ebf7eb',
-    fontSize: 16,
+    backgroundColor: 'white',
   },
   textArea: {
-    backgroundColor: '#ebf7eb',
+    backgroundColor: 'white',
     height: 100,
-    fontSize: 16,
   },
-  actionContainer: {
+  patientSelector: {
+    height: 56,
+    borderWidth: 1,
+    borderRadius: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  patientSelectorContent: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  button: {
+  selectedPatientContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedPatientName: {
     marginLeft: 12,
-    minWidth: 100,
-    borderRadius: 8,
+    fontWeight: '500',
   },
-  timeSelectorContainer: {
-    position: 'relative',
+  placeholderText: {
+    color: '#757575',
   },
-  centerIndicator: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    height: 48,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 8,
-    marginTop: -24,
-    zIndex: -1,
+  dateSelector: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  dateSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateIcon: {
+    marginRight: 12,
   },
   timeSelector: {
-    paddingVertical: 8,
-  },
-  timeSelectorRow: {
-    flexDirection: 'row',
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 4,
     justifyContent: 'center',
-    alignItems: 'center',
-    height: 160,
+    paddingHorizontal: 12,
   },
-  timePickerColumn: {
+  timeSelectorContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 70,
+    justifyContent: 'space-between',
+  },
+  timeIcon: {
+    marginRight: 12,
+  },
+  timePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 200,
+    marginVertical: 16,
+  },
+  timePickerWrapper: {
+    flex: 1,
+    alignItems: 'center',
   },
   timePickerLabel: {
     marginBottom: 8,
+    fontWeight: '600',
+  },
+  timePickerColumn: {
+    width: '80%',
+    height: 180,
+  },
+  timeItem: {
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+    borderRadius: 8,
+  },
+  timeItemText: {
+    fontSize: 16,
+  },
+  searchBar: {
+    marginBottom: 16,
+    backgroundColor: '#F5F5F5',
+  },
+  patientList: {
+    maxHeight: 300,
+  },
+  patientItemTitle: {
     fontWeight: '500',
-    fontSize: 14,
   },
-  timeScrollView: {
-    width: 70,
-    height: 160,
+  patientItemDescription: {
+    fontSize: 12,
   },
-  timeOption: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    marginVertical: 2,
-    borderRadius: 8,
-    height: 44,
+  actionSection: {
+    marginTop: 16,
+    marginBottom: 8,
   },
-  selectedTimeOption: {
-    borderRadius: 8,
+  note: {
+    fontSize: 12,
+    color: '#757575',
+    marginBottom: 16,
   },
-  selectedTimeText: {
-    color: 'white',
-    fontWeight: 'bold',
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
-  timeSeparator: {
-    fontSize: 24,
-    marginHorizontal: 4,
-    fontWeight: 'bold',
-  },
-  amPmContainer: {
-    width: 70,
-  },
-  amPmOption: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    marginVertical: 2,
+  cancelButton: {
+    marginRight: 12,
+    borderColor: '#E0E0E0',
     borderRadius: 8,
   },
-  patientItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingVertical: 8,
-    marginHorizontal: 4,
-  },
-  emptyPatientList: {
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
+  submitButton: {
+    borderRadius: 8,
   },
 }); 
