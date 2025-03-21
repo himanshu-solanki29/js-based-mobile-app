@@ -17,12 +17,16 @@ interface MedicalRecordFormProps {
   initialValues?: Partial<MedicalRecord>;
   onSubmit: (medicalRecord: MedicalRecord) => void;
   submitButtonText?: string;
+  disabled?: boolean;
+  loading?: boolean;
 }
 
 export function MedicalRecordForm({ 
   initialValues = {}, 
   onSubmit, 
-  submitButtonText = 'Submit'
+  submitButtonText = 'Submit',
+  disabled = false,
+  loading = false
 }: MedicalRecordFormProps) {
   const [medicalRecord, setMedicalRecord] = useState<MedicalRecord>({
     complaint: initialValues.complaint || '',
@@ -61,6 +65,7 @@ export function MedicalRecordForm({
           style={styles.input}
           outlineColor="#E0E0E0"
           activeOutlineColor="#4CAF50"
+          disabled={disabled}
         />
         
         <TextInput
@@ -71,6 +76,7 @@ export function MedicalRecordForm({
           style={styles.input}
           outlineColor="#E0E0E0"
           activeOutlineColor="#4CAF50"
+          disabled={disabled}
         />
         
         <TextInput
@@ -81,6 +87,7 @@ export function MedicalRecordForm({
           style={styles.input}
           outlineColor="#E0E0E0"
           activeOutlineColor="#4CAF50"
+          disabled={disabled}
         />
         
         <TextInput
@@ -91,6 +98,7 @@ export function MedicalRecordForm({
           style={styles.input}
           outlineColor="#E0E0E0"
           activeOutlineColor="#4CAF50"
+          disabled={disabled}
         />
         
         <TextInput
@@ -103,6 +111,7 @@ export function MedicalRecordForm({
           numberOfLines={3}
           outlineColor="#E0E0E0"
           activeOutlineColor="#4CAF50"
+          disabled={disabled}
         />
         
         <Button 
@@ -110,6 +119,8 @@ export function MedicalRecordForm({
           onPress={handleSubmit}
           style={styles.submitButton}
           buttonColor="#4CAF50"
+          disabled={disabled}
+          loading={loading}
         >
           {submitButtonText}
         </Button>

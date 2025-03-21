@@ -494,7 +494,7 @@ export default function HomeScreen() {
             <View>
               <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
                 <FontAwesome5 name="search" size={18} color="#4CAF50" />
-              </View>
+          </View>
               <ThemedText style={styles.actionText}>Search</ThemedText>
             </View>
           </TouchableRipple>
@@ -509,7 +509,7 @@ export default function HomeScreen() {
                 <FontAwesome5 name="cog" size={18} color="#4CAF50" />
               </View>
               <ThemedText style={styles.actionText}>Settings</ThemedText>
-            </View>
+          </View>
           </TouchableRipple>
         </View>
       </ScrollView>

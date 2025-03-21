@@ -251,11 +251,6 @@ export default function ExploreScreen() {
         iconColor="#2e7d32"
       />
 
-      <TouchableOpacity style={styles.addButton} onPress={() => router.push("/register")}>
-        <FontAwesome5 name="user-plus" size={16} color={Colors.light.buttonText} style={styles.buttonIcon} />
-        <ThemedText style={styles.buttonText}>Add New Patient</ThemedText>
-      </TouchableOpacity>
-
       {filteredPatients.length === 0 ? (
         <View style={styles.noResultsContainer}>
           <FontAwesome5 name="users" size={48} color="#CCCCCC" />
@@ -390,16 +385,6 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     fontSize: 12,
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    marginHorizontal: 16,
   },
   buttonIcon: {
     marginRight: 8,

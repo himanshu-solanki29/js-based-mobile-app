@@ -8,6 +8,9 @@ import 'react-native-reanimated';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { StyleSheet } from "react-native";
+import { GlobalToastProvider } from "@/components/GlobalToastProvider";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -18,63 +21,51 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Adapt the navigation themes to work with Paper
-  const { LightTheme: NavigationLightTheme, DarkTheme: NavigationDarkTheme } = adaptNavigationTheme({
-    reactNavigationLight: DefaultTheme,
-    reactNavigationDark: DarkTheme,
-  });
-
-  // Create custom Paper themes for light and dark modes with complete color mapping
-  const lightTheme = {
+  // Create the Paper theme
+  const paperLightTheme = {
     ...MD3LightTheme,
     colors: {
       ...MD3LightTheme.colors,
-      // Primary and accent colors
-      primary: Colors.light.tint,
-      primaryContainer: Colors.light.success,
-      secondaryContainer: Colors.light.warning,
-      tertiaryContainer: Colors.light.primary,
-      // Surface colors
-      background: Colors.light.background,
-      surface: Colors.light.card,
-      surfaceVariant: Colors.light.card,
-      // Error colors
-      error: Colors.light.error,
-      errorContainer: Colors.light.error,
-      // Text and icon colors
-      onPrimary: Colors.light.buttonText,
-      onBackground: Colors.light.text,
-      onSurface: Colors.light.text,
-      outline: Colors.light.icon,
+      primary: '#4CAF50',
+      secondary: '#8BC34A',
     },
   };
 
-  const darkTheme = {
+  const paperDarkTheme = {
     ...MD3DarkTheme,
     colors: {
       ...MD3DarkTheme.colors,
-      // Primary and accent colors
-      primary: Colors.dark.tint,
-      primaryContainer: Colors.dark.success,
-      secondaryContainer: Colors.dark.warning,
-      tertiaryContainer: Colors.dark.primary,
-      // Surface colors
-      background: Colors.dark.background,
-      surface: Colors.dark.card,
-      surfaceVariant: Colors.dark.card,
-      // Error colors
-      error: Colors.dark.error,
-      errorContainer: Colors.dark.error,
-      // Text and icon colors
-      onPrimary: Colors.dark.buttonText,
-      onBackground: Colors.dark.text,
-      onSurface: Colors.dark.text,
-      outline: Colors.dark.icon,
+      primary: '#66BB6A',
+      secondary: '#9CCC65',
+    },
+  };
+
+  // Create the Navigation theme
+  const navigationLightTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: '#4CAF50',
+      background: '#F8F9FA',
+      card: '#FFFFFF',
+      text: '#212121',
+    },
+  };
+
+  const navigationDarkTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      primary: '#66BB6A',
+      background: '#121212',
+      card: '#1E1E1E',
+      text: '#FFFFFF',
     },
   };
 
   // Select theme based on color scheme
-  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+  const paperTheme = colorScheme === 'dark' ? paperDarkTheme : paperLightTheme;
+  const navigationTheme = colorScheme === 'dark' ? navigationDarkTheme : navigationLightTheme;
 
   useEffect(() => {
     if (loaded) {
@@ -87,14 +78,24 @@ export default function RootLayout() {
   }
 
   return (
-    <PaperProvider theme={theme}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
+    <GestureHandlerRootView style={styles.container}>
+      <PaperProvider theme={paperTheme}>
+        <ThemeProvider value={navigationTheme}>
+          <GlobalToastProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </GlobalToastProvider>
+        </ThemeProvider>
         <StatusBar style="auto" />
-      </ThemeProvider>
-    </PaperProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
