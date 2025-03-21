@@ -1,6 +1,6 @@
 import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from "react-native";
 import { Colors } from "@/constants/Colors";
-import { Stack, useLocalSearchParams, router } from "expo-router";
+import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton } from 'react-native-paper';
@@ -15,7 +15,7 @@ import {
   addAppointment, 
   Appointment
 } from '@/utils/appointmentStore';
-import { MedicalRecord } from '@/utils/types';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
 
 // Mock appointment data used across the app
 // In a real app this would be in a central store/context
@@ -118,11 +118,47 @@ const MOCK_PATIENTS: PatientsData = {
   }
 };
 
+// Add MedicalRecord interface definition directly in the file
+// Define the MedicalRecord interface locally
+interface MedicalRecord {
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+}
+
+// Define status colors for consistent styling
+const STATUS_COLORS = {
+  confirmed: {
+    bg: '#E8F5E9',
+    text: '#2E7D32',
+    accent: '#4CAF50'
+  },
+  pending: {
+    bg: '#FFF3E0',
+    text: '#E65100',
+    accent: '#FF9800'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#0D47A1',
+    accent: '#2196F3'
+  },
+  cancelled: {
+    bg: '#FFEBEE',
+    text: '#B71C1C',
+    accent: '#F44336'
+  }
+};
+
 export default function PatientDetailsScreen() {
   const { id } = useLocalSearchParams();
+  const router = useRouter();
   const patientId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
   const patient = getPatientById(patientId);
   const [isSchedulerVisible, setSchedulerVisible] = useState(false);
+  const { showToast } = useGlobalToast();
 
   const handleScheduleAppointment = (appointmentData: {
     date: Date;
@@ -143,7 +179,7 @@ export default function PatientDetailsScreen() {
     });
     
     // Show toast notification
-    alert(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`);
+    showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
     
     // Close the scheduler
     setSchedulerVisible(false);
@@ -155,7 +191,7 @@ export default function PatientDetailsScreen() {
       <ThemedView style={styles.container}>
         <Stack.Screen options={{ title: "Patient Details" }} />
         <View style={styles.notFoundContainer}>
-          <FontAwesome5 name="user-slash" size={48} color="#4CAF50" style={{ marginBottom: 16 }} />
+          <FontAwesome5 name="user-slash" size={48} color="#9E9E9E" style={{ marginBottom: 16 }} />
           <ThemedText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>Patient not found</ThemedText>
           <ThemedText style={{ textAlign: 'center', color: '#666' }}>
             The patient you're looking for doesn't exist or has been removed.
@@ -164,7 +200,7 @@ export default function PatientDetailsScreen() {
             mode="contained" 
             onPress={() => router.replace("/(tabs)/explore")}
             style={{ marginTop: 24, borderRadius: 8 }}
-            buttonColor="#4CAF50"
+            buttonColor="#757575"
             textColor="#ffffff"
           >
             Back to Patients List
@@ -179,10 +215,14 @@ export default function PatientDetailsScreen() {
       <Stack.Screen options={{ title: patient.name }} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <ThemedText style={styles.title}>{patient.name}</ThemedText>
-          <TouchableOpacity style={styles.editButton} onPress={() => router.push(`/settings`)}>
-            <FontAwesome5 name="edit" size={16} color="#4CAF50" />
-          </TouchableOpacity>
+          <IconButton 
+            icon="arrow-left" 
+            size={24} 
+            onPress={() => router.back()} 
+            style={styles.backButton} 
+          />
+          <Text style={styles.headerTitle}>{patient.name || 'Patient Details'}</Text>
+          <View style={{ width: 40 }} />
         </View>
         
         <Surface style={styles.widgetSurface} elevation={1}>
@@ -193,31 +233,31 @@ export default function PatientDetailsScreen() {
           
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="user" size={14} color="#4CAF50" style={styles.infoIcon} /> Name:
+              <FontAwesome5 name="user" size={14} color="#757575" style={styles.infoIcon} /> Name:
             </ThemedText>
             <ThemedText>{patient.name}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="birthday-cake" size={14} color="#4CAF50" style={styles.infoIcon} /> Age:
+              <FontAwesome5 name="birthday-cake" size={14} color="#757575" style={styles.infoIcon} /> Age:
             </ThemedText>
             <ThemedText>{patient.age}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="venus-mars" size={14} color="#4CAF50" style={styles.infoIcon} /> Gender:
+              <FontAwesome5 name="venus-mars" size={14} color="#757575" style={styles.infoIcon} /> Gender:
             </ThemedText>
             <ThemedText>{patient.gender}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="phone" size={14} color="#4CAF50" style={styles.infoIcon} /> Phone:
+              <FontAwesome5 name="phone" size={14} color="#757575" style={styles.infoIcon} /> Phone:
             </ThemedText>
             <ThemedText>{patient.phone}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="envelope" size={14} color="#4CAF50" style={styles.infoIcon} /> Email:
+              <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.infoIcon} /> Email:
             </ThemedText>
             <ThemedText>{patient.email}</ThemedText>
           </ThemedView>
@@ -231,25 +271,25 @@ export default function PatientDetailsScreen() {
           
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="ruler-vertical" size={14} color="#4CAF50" style={styles.infoIcon} /> Height:
+              <FontAwesome5 name="ruler-vertical" size={14} color="#757575" style={styles.infoIcon} /> Height:
             </ThemedText>
             <ThemedText>{patient.height}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="weight" size={14} color="#4CAF50" style={styles.infoIcon} /> Weight:
+              <FontAwesome5 name="weight" size={14} color="#757575" style={styles.infoIcon} /> Weight:
             </ThemedText>
             <ThemedText>{patient.weight}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="heartbeat" size={14} color="#4CAF50" style={styles.infoIcon} /> Blood Pressure:
+              <FontAwesome5 name="heartbeat" size={14} color="#757575" style={styles.infoIcon} /> Blood Pressure:
             </ThemedText>
             <ThemedText>{patient.bloodPressure}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.infoRow}>
             <ThemedText style={styles.label}>
-              <FontAwesome5 name="notes-medical" size={14} color="#4CAF50" style={styles.infoIcon} /> Medical History:
+              <FontAwesome5 name="notes-medical" size={14} color="#757575" style={styles.infoIcon} /> Medical History:
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.medicalHistoryContainer}>
@@ -281,18 +321,27 @@ export default function PatientDetailsScreen() {
                 <View style={styles.appointmentItem}>
                   <View style={styles.appointmentRow}>
                     <View style={[
-                      styles.dateBox, 
-                      appointment.status === 'pending' ? styles.pendingDateBox : {}
+                      styles.appointmentDateBox,
+                      { 
+                        backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg,
+                        borderWidth: 1,
+                        borderColor: '#E0E0E0',
+                        shadowColor: "#000",
+                        shadowOffset: {width: 0, height: 1},
+                        shadowOpacity: 0.1,
+                        shadowRadius: 1,
+                        elevation: 1
+                      }
                     ]}>
                       <ThemedText style={[
-                        styles.dateDay,
-                        appointment.status === 'pending' ? styles.pendingDateText : {}
+                        styles.appointmentDay,
+                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
                       ]}>
                         {new Date(appointment.date).getDate()}
                       </ThemedText>
                       <ThemedText style={[
-                        styles.dateMonth,
-                        appointment.status === 'pending' ? styles.pendingDateText : {}
+                        styles.appointmentMonth,
+                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
                       ]}>
                         {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
                       </ThemedText>
@@ -304,16 +353,20 @@ export default function PatientDetailsScreen() {
                           <FontAwesome5 
                             name="clock" 
                             size={12} 
-                            color={appointment.status === 'pending' ? "#FF9800" : "#4CAF50"} 
+                            color={STATUS_COLORS[appointment.status]?.accent || 
+                              (appointment.status === 'confirmed' || appointment.status === 'pending' 
+                                ? STATUS_COLORS.confirmed.accent 
+                                : STATUS_COLORS.completed.accent)} 
+                            style={{marginRight: 4}}
                           /> {appointment.time}
-                        </ThemedText>
+                </ThemedText>
                         <View style={[
                           styles.statusBadge,
-                          appointment.status === 'pending' ? styles.pendingBadge : {}
+                          { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
                         ]}>
                           <ThemedText style={[
                             styles.statusText,
-                            appointment.status === 'pending' ? styles.pendingStatusText : {}
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
                           ]}>{appointment.status}</ThemedText>
                         </View>
                       </View>
@@ -345,76 +398,136 @@ export default function PatientDetailsScreen() {
 
         <Surface style={styles.widgetSurface} elevation={1}>
           <View style={styles.widgetHeader}>
-            <ThemedText style={styles.widgetTitle}>Visit History</ThemedText>
-            <Button 
-              mode="text" 
-              onPress={() => setSchedulerVisible(true)}
-              labelStyle={styles.scheduleButtonText}
-              icon={() => <FontAwesome5 name="plus" size={16} color="#4CAF50" />}
-              compact
-            >
-              Schedule
-            </Button>
+            <ThemedText style={styles.widgetTitle}>Medical History</ThemedText>
           </View>
           
           {/* Past Appointments */}
           <View style={styles.pastAppointmentsContainer}>
-            <ThemedText style={styles.sectionSubtitle}>Past Appointments</ThemedText>
+            <Divider style={styles.divider} />
+            
             {getPatientAppointments(patientId)
               .filter(app => ['completed', 'cancelled'].includes(app.status))
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 5)
-              .map((appointment, index) => (
-                <View key={appointment.id}>
-                  {index > 0 && <Divider style={styles.appointmentDivider} />}
-                  <View style={styles.appointmentItem}>
-                    <View style={styles.appointmentRow}>
-                      <View style={[
-                        styles.dateBox, 
-                        appointment.status === 'completed' ? styles.completedDateBox : styles.cancelledDateBox
-                      ]}>
-                        <ThemedText style={[
-                          styles.dateDay,
-                          appointment.status === 'completed' ? styles.completedDateText : styles.cancelledDateText
+              .map((appointment, index) => {
+                // Extract medical record info from notes if it's a completed appointment
+                let medicalRecord = null;
+                if (appointment.status === 'completed' && appointment.notes) {
+                  // Try to parse medical record from appointment notes
+                  const noteLines = appointment.notes.split('\n');
+                  const recordData: Partial<MedicalRecord> = {};
+                  
+                  noteLines.forEach(line => {
+                    if (line.includes('Complaint:')) recordData.complaint = line.split('Complaint:')[1]?.trim();
+                    if (line.includes('Diagnosis:')) recordData.diagnosis = line.split('Diagnosis:')[1]?.trim();
+                    if (line.includes('Blood Pressure:')) recordData.bloodPressure = line.split('Blood Pressure:')[1]?.trim();
+                    if (line.includes('Weight:')) recordData.weight = line.split('Weight:')[1]?.trim();
+                    if (line.includes('Prescription:')) recordData.prescription = line.split('Prescription:')[1]?.trim();
+                  });
+                  
+                  // Only set medical record if we found some data
+                  if (Object.keys(recordData).length > 0) {
+                    medicalRecord = {
+                      complaint: recordData.complaint || 'Not recorded',
+                      diagnosis: recordData.diagnosis || 'Not recorded',
+                      bloodPressure: recordData.bloodPressure || 'Not recorded',
+                      weight: recordData.weight || 'Not recorded',
+                      prescription: recordData.prescription || 'Not recorded'
+                    };
+                  }
+                }
+                
+                return (
+                  <Surface key={appointment.id} style={styles.appointmentCard} elevation={1}>
+                    <View style={styles.appointmentCardHeader}>
+                      <View style={styles.appointmentHeaderLeft}>
+                        <View style={[
+                          styles.appointmentDateBox, 
+                          { 
+                            backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg,
+                            borderWidth: 1,
+                            borderColor: '#E0E0E0',
+                            shadowColor: "#000",
+                            shadowOffset: {width: 0, height: 1},
+                            shadowOpacity: 0.1,
+                            shadowRadius: 1,
+                            elevation: 1
+                          }
                         ]}>
-                          {new Date(appointment.date).getDate()}
-                        </ThemedText>
-                        <ThemedText style={[
-                          styles.dateMonth,
-                          appointment.status === 'completed' ? styles.completedDateText : styles.cancelledDateText
-                        ]}>
-                          {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
-                        </ThemedText>
-                      </View>
-                      
-                      <View style={styles.appointmentDetails}>
-                        <View style={styles.appointmentHeader}>
+                          <ThemedText style={[
+                            styles.appointmentDay,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {new Date(appointment.date).getDate()}
+                          </ThemedText>
+                          <ThemedText style={[
+                            styles.appointmentMonth,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={styles.appointmentHeaderContent}>
                           <ThemedText style={styles.appointmentTime}>
                             <FontAwesome5 
                               name="clock" 
                               size={12} 
-                              color={appointment.status === 'completed' ? "#4CAF50" : "#F44336"} 
+                              color={STATUS_COLORS[appointment.status]?.accent || STATUS_COLORS.completed.accent} 
+                              style={{marginRight: 4}}
                             /> {appointment.time}
                           </ThemedText>
-                          <View style={[
-                            styles.statusBadge,
-                            appointment.status === 'completed' ? styles.completedBadge : styles.cancelledBadge
-                          ]}>
-                            <ThemedText style={[
-                              styles.statusText,
-                              appointment.status === 'completed' ? styles.completedStatusText : styles.cancelledStatusText
-                            ]}>{appointment.status}</ThemedText>
-                          </View>
+                          <ThemedText style={styles.reasonText}>{appointment.reason}</ThemedText>
                         </View>
-                        <ThemedText style={styles.reasonText}>{appointment.reason}</ThemedText>
-                        {appointment.notes && (
-                          <ThemedText style={styles.notesText}>Notes: {appointment.notes}</ThemedText>
-                        )}
+                      </View>
+                      
+                      <View style={[
+                        styles.statusBadge,
+                        { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                      ]}>
+                        <ThemedText style={[
+                          styles.statusText,
+                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                        ]}>{appointment.status}</ThemedText>
                       </View>
                     </View>
-                  </View>
-                </View>
-              ))
+                    
+                    {/* Show simplified notes if no medical record data was extracted */}
+                    {appointment.notes && !medicalRecord && (
+                      <View style={styles.notesContainer}>
+                        <Divider style={styles.notesDivider} />
+                        <ThemedText style={styles.notesText}>Notes: {appointment.notes}</ThemedText>
+                      </View>
+                    )}
+                    
+                    {/* Show medical record data if available */}
+                    {medicalRecord && (
+                      <View style={styles.medicalRecordContainer}>
+                        <Divider style={styles.medicalRecordDivider} />
+                        <ThemedText style={styles.medicalRecordTitle}>
+                          <FontAwesome5 
+                            name="notes-medical" 
+                            size={14} 
+                            color={STATUS_COLORS[appointment.status]?.accent || STATUS_COLORS.completed.accent} 
+                            style={{marginRight: 6}} 
+                          /> 
+                          Medical Record
+                        </ThemedText>
+                        
+                        <View style={styles.medicalRecordGrid}>
+                          {Object.entries(medicalRecord).map(([key, value], idx) => (
+                            <View key={key} style={styles.medicalRecordItem}>
+                              <ThemedText style={styles.medicalRecordLabel}>
+                                {key.charAt(0).toUpperCase() + key.slice(1)}:
+                              </ThemedText>
+                              <ThemedText style={styles.medicalRecordValue}>{value as string}</ThemedText>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </Surface>
+                );
+              })
             }
             
             {getPatientAppointments(patientId)
@@ -422,74 +535,9 @@ export default function PatientDetailsScreen() {
               .length === 0 && (
               <View style={styles.emptyContent}>
                 <FontAwesome5 name="history" size={32} color="#CCCCCC" />
-                <ThemedText style={styles.emptyText}>No past appointments</ThemedText>
+                <ThemedText style={styles.emptyText}>No medical history records</ThemedText>
+                <ThemedText style={styles.emptySubText}>Complete an appointment to add medical records</ThemedText>
               </View>
-            )}
-          </View>
-
-          <Divider style={styles.divider} />
-
-          {/* Medical Visit Records */}
-          <View style={styles.medicalRecordsContainer}>
-            <ThemedText style={styles.sectionSubtitle}>Medical Records</ThemedText>
-            
-            {patient.visits.length === 0 ? (
-              <View style={styles.emptyContent}>
-                <FontAwesome5 name="notes-medical" size={32} color="#CCCCCC" />
-                <ThemedText style={styles.emptyText}>No visit records</ThemedText>
-                <ThemedText style={styles.emptySubText}>
-                  Complete an appointment to add visit records
-                </ThemedText>
-              </View>
-            ) : (
-              patient.visits.map((visit, index) => {
-                // Ensure all fields are available by providing defaults if any field is missing
-                const medicalRecord: MedicalRecord = {
-                  complaint: visit.complaint || 'Not recorded',
-                  diagnosis: visit.diagnosis || 'Not recorded',
-                  bloodPressure: visit.bloodPressure || 'Not recorded',
-                  weight: visit.weight || 'Not recorded',
-                  prescription: visit.prescription || 'Not recorded'
-                };
-                
-                return (
-                  <View key={index}>
-                    {index > 0 && <Divider style={styles.visitDivider} />}
-                    <View style={styles.visitItem}>
-                      <View style={styles.visitHeader}>
-                        <ThemedText style={styles.visitDate}>
-                          <FontAwesome5 name="calendar-day" size={14} color="#4CAF50" /> {formatDate(visit.date)}
-                        </ThemedText>
-                      </View>
-                      
-                      <View style={styles.visitInfoRow}>
-                        <ThemedText style={styles.visitLabel}>Complaint:</ThemedText>
-                        <ThemedText style={styles.visitValue}>{medicalRecord.complaint}</ThemedText>
-                      </View>
-                      
-                      <View style={styles.visitInfoRow}>
-                        <ThemedText style={styles.visitLabel}>Diagnosis:</ThemedText>
-                        <ThemedText style={styles.visitValue}>{medicalRecord.diagnosis}</ThemedText>
-                      </View>
-                      
-                      <View style={styles.visitInfoRow}>
-                        <ThemedText style={styles.visitLabel}>Blood Pressure:</ThemedText>
-                        <ThemedText style={styles.visitValue}>{medicalRecord.bloodPressure}</ThemedText>
-                      </View>
-                      
-                      <View style={styles.visitInfoRow}>
-                        <ThemedText style={styles.visitLabel}>Weight:</ThemedText>
-                        <ThemedText style={styles.visitValue}>{medicalRecord.weight}</ThemedText>
-                      </View>
-                      
-                      <View style={styles.visitInfoRow}>
-                        <ThemedText style={styles.visitLabel}>Prescription:</ThemedText>
-                        <ThemedText style={styles.visitValue}>{medicalRecord.prescription}</ThemedText>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
             )}
           </View>
         </Surface>
@@ -509,41 +557,48 @@ export default function PatientDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingBottom: 32,
+    paddingTop: 0,
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    marginBottom: 8,
   },
-  title: {
-    fontSize: 24,
+  backButton: {
+    marginLeft: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-  },
-  editButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#E8F5E9',
-    height: 40,
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#424242',
   },
   widgetSurface: {
-    borderRadius: 16,
-    backgroundColor: 'white',
-    marginBottom: 20,
+    marginHorizontal: 0,
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   sectionHeader: {
-    padding: 16,
-    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   widgetHeader: {
     flexDirection: 'row',
@@ -554,8 +609,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   widgetTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
   },
   divider: {
     backgroundColor: '#E0E0E0',
@@ -565,26 +620,26 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   label: {
-    width: 120,
-    fontWeight: '600',
-    color: '#555555',
+    width: 130,
+    fontWeight: '500',
   },
   infoIcon: {
     marginRight: 8,
+    color: '#757575',
   },
   medicalHistoryContainer: {
-    margin: 16,
-    marginTop: 8,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#EEEEEE',
   },
   scheduleButtonText: {
     color: '#4CAF50',
@@ -598,29 +653,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  dateBox: {
+  appointmentDateBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8F5E9',
     borderRadius: 10,
     padding: 8,
     width: 48,
     height: 48,
   },
-  pendingDateBox: {
-    backgroundColor: '#FFF3E0',
-  },
-  dateDay: {
+  appointmentDay: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
   },
-  pendingDateText: {
-    color: '#E65100',
-  },
-  dateMonth: {
+  appointmentMonth: {
     fontSize: 12,
-    color: '#2E7D32',
     fontWeight: '600',
   },
   appointmentDetails: {
@@ -638,24 +684,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statusBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pendingBadge: {
-    backgroundColor: '#FFF3E0',
-  },
   statusText: {
-    color: '#2E7D32',
     fontWeight: '600',
     fontSize: 12,
     textTransform: 'capitalize',
-  },
-  pendingStatusText: {
-    color: '#E65100',
   },
   reasonText: {
     fontSize: 14,
@@ -663,8 +701,8 @@ const styles = StyleSheet.create({
   },
   appointmentDivider: {
     height: 1,
-    marginHorizontal: 16,
     backgroundColor: '#EEEEEE',
+    marginVertical: 8,
   },
   emptyContent: {
     alignItems: 'center',
@@ -674,12 +712,11 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 8,
     marginBottom: 8,
-    color: '#9E9E9E',
     fontSize: 16,
     fontWeight: '500',
+    color: '#9E9E9E',
   },
   emptySubText: {
-    color: '#9E9E9E',
     textAlign: 'center',
     fontSize: 14,
   },
@@ -692,75 +729,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  medicalRecordsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
   sectionSubtitle: {
     fontWeight: '600',
     fontSize: 16,
     marginBottom: 12,
-    marginTop: 4,
-    color: '#2e7d32',
+    color: '#424242',
   },
-  completedDateBox: {
-    backgroundColor: '#E8F5E9',
+  appointmentCard: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'white',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  completedDateText: {
-    color: '#4CAF50',
+  appointmentCardHeader: {
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  cancelledDateBox: {
-    backgroundColor: '#FFEBEE',
+  appointmentHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
   },
-  cancelledDateText: {
-    color: '#F44336',
+  appointmentHeaderContent: {
+    marginLeft: 12,
+    flex: 1,
   },
-  completedBadge: {
-    backgroundColor: '#E8F5E9',
+  notesContainer: {
+    padding: 16,
+    paddingTop: 0,
   },
-  completedStatusText: {
-    color: '#4CAF50',
-  },
-  cancelledBadge: {
-    backgroundColor: '#FFEBEE',
-  },
-  cancelledStatusText: {
-    color: '#F44336',
-  },
-  notesText: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#757575',
-    fontStyle: 'italic',
-  },
-  visitItem: {
-    paddingVertical: 12,
-  },
-  visitHeader: {
+  notesDivider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
     marginBottom: 12,
   },
-  visitDate: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4CAF50',
+  medicalRecordContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
   },
-  visitInfoRow: {
+  medicalRecordDivider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+  },
+  medicalRecordTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    padding: 12,
+    paddingLeft: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  medicalRecordGrid: {
+    padding: 16,
+    paddingTop: 12,
+  },
+  medicalRecordItem: {
+    marginBottom: 10,
     flexDirection: 'row',
-    marginBottom: 8,
   },
-  visitLabel: {
-    width: 120,
-    fontWeight: '600',
-    color: '#555555',
+  medicalRecordLabel: {
+    fontSize: 13,
+    color: '#757575',
+    fontWeight: '500',
+    width: 110,
   },
-  visitValue: {
+  medicalRecordValue: {
+    fontSize: 13,
     flex: 1,
     color: '#333333',
   },
-  visitDivider: {
-    height: 1,
-    backgroundColor: '#EEEEEE',
-    marginVertical: 8,
+  notesText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#757575',
   },
   notFoundContainer: {
     flex: 1,
