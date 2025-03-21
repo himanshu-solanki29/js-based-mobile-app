@@ -94,6 +94,10 @@ export default function AppointmentDetailsScreen() {
   // New state for status transition animation
   const [statusChanged, setStatusChanged] = useState(false);
   
+  // New state for completing an appointment
+  const [completeDialogVisible, setCompleteDialogVisible] = useState(false);
+  const [completeNotes, setCompleteNotes] = useState("");
+  
   // This effect is triggered when appointment status changes and updates all states
   useEffect(() => {
     if (appointment) {
@@ -213,12 +217,41 @@ export default function AppointmentDetailsScreen() {
     }
   };
   
-  const handleConfirmAppointment = () => {
-    handleStatusChange();
-  };
-
   const handleCompleteAppointment = () => {
-    handleStatusChange();
+    if (!appointment) return;
+    
+    // Disable actions while in progress
+    setActionInProgress(true);
+    
+    // Update appointment status
+    const updatedAppointment = updateAppointmentStatus(
+      appointment.id,
+      'completed',
+      completeNotes
+    );
+    
+    if (updatedAppointment) {
+      // Show status changed animation
+      setStatusChanged(true);
+      setTimeout(() => setStatusChanged(false), 2000);
+      
+      // Update local state
+      setAppointment(updatedAppointment);
+      
+      // Trigger a refresh to make sure all components using the appointments data are updated
+      setRefreshKey(prev => prev + 1);
+      
+      // Show success notification
+      showToast(`Appointment has been completed`, "success");
+      
+      // Reset form state
+      setCompleteDialogVisible(false);
+      setCompleteNotes("");
+    } else {
+      // Show error notification
+      showToast("Failed to update appointment status", "error");
+      setActionInProgress(false);
+    }
   };
 
   const handleCancelAppointment = () => {
@@ -451,6 +484,32 @@ export default function AppointmentDetailsScreen() {
               </Button>
             </View>
           )}
+
+          {appointment.status === 'confirmed' && !actionInProgress && (
+            <View style={styles.buttonGroup}>
+              <Button 
+                mode="outlined"
+                icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
+                style={styles.cancelAppointmentButton}
+                textColor="#F44336"
+                onPress={() => openStatusChangeDialog('cancelled')}
+                disabled={actionInProgress}
+              >
+                Cancel
+              </Button>
+              <Button 
+                mode="contained"
+                icon={() => <FontAwesome5 name="check-circle" size={16} color="#FFFFFF" />}
+                style={styles.confirmButton}
+                buttonColor="#4CAF50"
+                textColor="#FFFFFF"
+                onPress={() => setCompleteDialogVisible(true)}
+                disabled={actionInProgress}
+              >
+                Complete
+              </Button>
+            </View>
+          )}
         </Surface>
       </ScrollView>
       
@@ -517,6 +576,63 @@ export default function AppointmentDetailsScreen() {
             {selectedStatus === 'confirmed' ? 'Confirm' :
              selectedStatus === 'cancelled' ? 'Cancel Appointment' :
              selectedStatus === 'pending' ? 'Restore' : 'Change Status'}
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+      
+      {/* Complete Appointment Dialog */}
+      <Dialog 
+        visible={completeDialogVisible} 
+        onDismiss={() => !actionInProgress && setCompleteDialogVisible(false)}
+        style={styles.dialog}
+      >
+        <Dialog.Title style={styles.dialogTitle}>
+          <FontAwesome5 
+            name="check-circle" 
+            size={16} 
+            color="#4CAF50" 
+            style={{marginRight: 6}} 
+          />
+          Complete Appointment
+        </Dialog.Title>
+        
+        <Dialog.Content>
+          <ThemedText style={styles.dialogText}>
+            Are you sure you want to mark this appointment as completed?
+          </ThemedText>
+          
+          <TextInput
+            label="Completion Notes (optional)"
+            value={completeNotes}
+            onChangeText={setCompleteNotes}
+            mode="outlined"
+            style={styles.input}
+            multiline
+            numberOfLines={3}
+            outlineColor="#E0E0E0"
+            activeOutlineColor="#4CAF50"
+            disabled={actionInProgress}
+            placeholder="Enter any notes about the appointment outcome"
+          />
+        </Dialog.Content>
+        
+        <Dialog.Actions style={styles.dialogActions}>
+          <Button 
+            onPress={() => setCompleteDialogVisible(false)} 
+            textColor="#757575"
+            disabled={actionInProgress}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onPress={handleCompleteAppointment}
+            mode="contained"
+            buttonColor="#4CAF50"
+            style={{borderRadius: 8}}
+            disabled={actionInProgress}
+            loading={actionInProgress}
+          >
+            Complete Appointment
           </Button>
         </Dialog.Actions>
       </Dialog>
