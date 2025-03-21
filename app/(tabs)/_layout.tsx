@@ -2,12 +2,29 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import { Animated } from 'react-native';
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+
+// Create tab style with no borders/shadows for a cleaner look
+const cleanTabStyle = {
+  elevation: 0,
+  shadowOpacity: 0,
+  borderTopWidth: 0,
+};
+
+// Custom animation for transitioning between screens
+function forFade({ current }) {
+  return {
+    cardStyle: {
+      opacity: current.progress,
+    },
+  };
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -19,12 +36,12 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            position: "absolute",
-          },
-          default: {},
-        }),
+        tabBarStyle: {
+          ...(Platform.OS === 'ios' ? { position: "absolute" } : {}),
+          ...cleanTabStyle,
+        },
+        // Add tab animation - supported values are 'fade', 'shift', or 'none'
+        animation: 'fade',
       }}>
       <Tabs.Screen
         name="index"
