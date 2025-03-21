@@ -471,71 +471,76 @@ export default function AppointmentsScreen() {
     };
     
     return (
-      <Card 
-        style={styles.appointmentCard}
-        mode="elevated"
+      <TouchableRipple
         onPress={() => router.push(`/appointment/${item.id}`)}
+        rippleColor="rgba(0, 0, 0, 0.08)"
+        style={{ borderRadius: 16, marginBottom: 12 }}
       >
-        <Card.Content style={styles.cardContent}>
-          <View style={styles.appointmentRow}>
-            <View style={[
-              styles.dateBox, 
-              { backgroundColor: statusColors.bg }
-            ]}>
-              <ThemedText style={[
-                styles.dateDay,
-                { color: statusColors.text }
+        <Card 
+          style={styles.appointmentCard}
+          mode="elevated"
+        >
+          <Card.Content style={styles.cardContent}>
+            <View style={styles.appointmentRow}>
+              <View style={[
+                styles.dateBox, 
+                { backgroundColor: statusColors.bg }
               ]}>
-                {new Date(item.date).getDate()}
-              </ThemedText>
-              <ThemedText style={[
-                styles.dateMonth,
-                { color: statusColors.text }
-              ]}>
-                {new Date(item.date).toLocaleString('default', { month: 'short' })}
-              </ThemedText>
-            </View>
-            
-            <View style={styles.appointmentDetails}>
-              <View style={styles.appointmentHeaderInner}>
-                <ThemedText style={styles.patientName}>{patientName}</ThemedText>
-                <TouchableRipple
-                  onPress={() => {
-                    if (item.status === 'pending') {
-                      handleStatusChange('confirmed');
-                    } else if (item.status === 'confirmed') {
-                      handleStatusChange('completed');
-                    }
-                  }}
-                  rippleColor="rgba(0, 0, 0, 0.1)"
-                  style={{ borderRadius: 12 }}
-                >
-                  <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: statusColors.bg }
-                  ]}>
-                    <ThemedText style={[
-                      styles.statusText,
-                      { color: statusColors.text }
-                    ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
-                  </View>
-                </TouchableRipple>
+                <ThemedText style={[
+                  styles.dateDay,
+                  { color: statusColors.text }
+                ]}>
+                  {new Date(item.date).getDate()}
+                </ThemedText>
+                <ThemedText style={[
+                  styles.dateMonth,
+                  { color: statusColors.text }
+                ]}>
+                  {new Date(item.date).toLocaleString('default', { month: 'short' })}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.appointmentTime}>
-                <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
-              </ThemedText>
-              <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
               
-              {item.notes && (
-                <View style={{marginTop: 8}}>
-                  <ThemedText style={styles.notesLabel}>Notes:</ThemedText>
-                  <ThemedText style={styles.notesText}>{item.notes}</ThemedText>
+              <View style={styles.appointmentDetails}>
+                <View style={styles.appointmentHeaderInner}>
+                  <ThemedText style={styles.patientName}>{patientName}</ThemedText>
+                  <TouchableRipple
+                    onPress={() => {
+                      if (item.status === 'pending') {
+                        handleStatusChange('confirmed');
+                      } else if (item.status === 'confirmed') {
+                        handleStatusChange('completed');
+                      }
+                    }}
+                    rippleColor="rgba(0, 0, 0, 0.1)"
+                    style={{ borderRadius: 12 }}
+                  >
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: statusColors.bg }
+                    ]}>
+                      <ThemedText style={[
+                        styles.statusText,
+                        { color: statusColors.text }
+                      ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
+                    </View>
+                  </TouchableRipple>
                 </View>
-              )}
+                <ThemedText style={styles.appointmentTime}>
+                  <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
+                </ThemedText>
+                <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
+                
+                {item.notes && (
+                  <View style={{marginTop: 8}}>
+                    <ThemedText style={styles.notesLabel}>Notes:</ThemedText>
+                    <ThemedText style={styles.notesText}>{item.notes}</ThemedText>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
+      </TouchableRipple>
     );
   };
 
@@ -585,25 +590,34 @@ export default function AppointmentsScreen() {
             : { bg: '#f0f0f0', text: '#757575', accent: '#757575' };
           
           return (
-            <Chip
+            <TouchableRipple
               key={option}
-              selected={isSelected}
               onPress={() => setSelectedStatus(option)}
-              style={[
-                styles.statusChip,
-                { 
-                  backgroundColor: isSelected ? chipColors.bg : 'transparent',
-                  borderColor: chipColors.accent,
-                  borderWidth: isSelected ? 0 : 1
-                }
-              ]}
-              textStyle={{
-                color: isSelected ? chipColors.text : chipColors.accent,
-                fontWeight: isSelected ? 'bold' : 'normal'
+              rippleColor={isSelected ? `${chipColors.accent}20` : "rgba(0, 0, 0, 0.08)"}
+              style={{ 
+                borderRadius: 20,
+                marginHorizontal: 4,
+                overflow: 'hidden'
               }}
             >
-              {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
-            </Chip>
+              <Chip
+                selected={isSelected}
+                style={[
+                  styles.statusChip,
+                  { 
+                    backgroundColor: isSelected ? chipColors.bg : 'transparent',
+                    borderColor: chipColors.accent,
+                    borderWidth: isSelected ? 0 : 1
+                  }
+                ]}
+                textStyle={{
+                  color: isSelected ? chipColors.text : chipColors.accent,
+                  fontWeight: isSelected ? 'bold' : 'normal'
+                }}
+              >
+                {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
+              </Chip>
+            </TouchableRipple>
           );
         })}
       </ScrollView>
@@ -649,7 +663,7 @@ export default function AppointmentsScreen() {
             }
           ]}
           onPress={() => setDatePickerVisible(true)}
-          rippleColor="rgba(46, 125, 50, 0.16)"
+          rippleColor="rgba(46, 125, 50, 0.12)"
         >
           <View style={styles.dateFilterContainer}>
             <FontAwesome5 name="calendar-alt" size={16} color="#2e7d32" style={styles.datePickerIcon} />
@@ -762,6 +776,7 @@ export default function AppointmentsScreen() {
         style={[styles.fab, { backgroundColor: '#4CAF50' }]}
         color="#ffffff"
         onPress={() => setSchedulerVisible(true)}
+        rippleColor="rgba(255, 255, 255, 0.2)"
       />
     </ThemedView>
   );
@@ -799,7 +814,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statusChip: {
-    marginHorizontal: 4,
+    marginHorizontal: 0,
     borderRadius: 20, // More rounded iOS-style pill
     height: 36,
     paddingVertical: 2,
@@ -837,7 +852,7 @@ const styles = StyleSheet.create({
     color: '#2e7d32',
   },
   appointmentCard: {
-    marginBottom: 12,
+    marginBottom: 0,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'white',
