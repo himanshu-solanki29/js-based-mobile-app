@@ -1,11 +1,25 @@
 import patientStorageService from './patientStorageService';
 import appointmentStorageService from './appointmentStorageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+
+// Check if running on web
+const isWeb = Platform.OS === 'web';
 
 // Function to check if this is the first app launch
 const isFirstLaunch = async (): Promise<boolean> => {
   try {
-    const value = await AsyncStorage.getItem('@app_first_launch');
+    const APP_FIRST_LAUNCH_KEY = '@app_first_launch';
+    let value: string | null;
+    
+    if (isWeb) {
+      // Use localStorage on web
+      value = localStorage.getItem(APP_FIRST_LAUNCH_KEY);
+    } else {
+      // Use AsyncStorage on native
+      value = await AsyncStorage.getItem(APP_FIRST_LAUNCH_KEY);
+    }
+    
     return value === null; // If null, this is the first launch
   } catch (error) {
     console.error('Error checking first launch status:', error);
@@ -16,7 +30,15 @@ const isFirstLaunch = async (): Promise<boolean> => {
 // Function to mark app as launched
 const markAsLaunched = async (): Promise<void> => {
   try {
-    await AsyncStorage.setItem('@app_first_launch', 'false');
+    const APP_FIRST_LAUNCH_KEY = '@app_first_launch';
+    
+    if (isWeb) {
+      // Use localStorage on web
+      localStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
+    } else {
+      // Use AsyncStorage on native
+      await AsyncStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
+    }
   } catch (error) {
     console.error('Error marking app as launched:', error);
   }

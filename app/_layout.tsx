@@ -3,23 +3,28 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
-import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider, MD3DarkTheme, MD3LightTheme, Snackbar } from 'react-native-paper';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Platform, View, Text } from "react-native";
 import { GlobalToastProvider } from "@/components/GlobalToastProvider";
 import { initializeStorage } from '@/utils/initializeStorage';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(error => {
+  console.warn("Error preventing splash screen auto-hide:", error);
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  
+  const [storageInitialized, setStorageInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   // Create the Paper theme
   const paperLightTheme = {
@@ -73,21 +78,30 @@ export default function RootLayout() {
       try {
         await initializeStorage();
         console.log('Storage initialized successfully');
+        setStorageInitialized(true);
       } catch (error) {
         console.error('Failed to initialize storage:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setInitError(`Storage initialization failed: ${errorMessage}`);
+        // Still mark as initialized so app can proceed even with error
+        setStorageInitialized(true);
       }
     };
 
     setupStorage();
   }, []);
 
+  // Hide splash screen when loaded
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (loaded && storageInitialized) {
+      SplashScreen.hideAsync().catch(error => {
+        console.warn("Error hiding splash screen:", error);
+      });
     }
-  }, [loaded]);
+  }, [loaded, storageInitialized]);
 
-  if (!loaded) {
+  // Show loading if not ready
+  if (!loaded || !storageInitialized) {
     return null;
   }
 
@@ -100,6 +114,20 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="+not-found" />
             </Stack>
+            
+            {initError && (
+              <Snackbar
+                visible={!!initError}
+                onDismiss={() => setInitError(null)}
+                action={{
+                  label: 'Dismiss',
+                  onPress: () => setInitError(null),
+                }}
+                style={{ backgroundColor: '#D32F2F' }}
+              >
+                <Text style={{ color: 'white' }}>{initError}</Text>
+              </Snackbar>
+            )}
           </GlobalToastProvider>
         </ThemeProvider>
         <StatusBar style="auto" />

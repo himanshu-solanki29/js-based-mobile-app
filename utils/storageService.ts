@@ -1,6 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-// Base class for all storage services
+/**
+ * Check if the app is running on web platform
+ */
+const isWeb = Platform.OS === 'web';
+
+/**
+ * Storage service class that provides methods to interact with device storage
+ * Uses AsyncStorage for mobile and localStorage for web
+ */
 class StorageService<T> {
   private key: string;
   
@@ -8,21 +17,41 @@ class StorageService<T> {
     this.key = key;
   }
   
-  // Save data to storage
+  /**
+   * Save data to storage
+   */
   async saveData(data: T): Promise<void> {
     try {
       const jsonValue = JSON.stringify(data);
-      await AsyncStorage.setItem(this.key, jsonValue);
+      
+      if (isWeb) {
+        // Use localStorage for web
+        localStorage.setItem(this.key, jsonValue);
+      } else {
+        // Use AsyncStorage for native
+        await AsyncStorage.setItem(this.key, jsonValue);
+      }
     } catch (e) {
       console.error(`Error saving data to ${this.key}:`, e);
       throw e;
     }
   }
   
-  // Get data from storage
+  /**
+   * Get data from storage
+   */
   async getData(): Promise<T | null> {
     try {
-      const jsonValue = await AsyncStorage.getItem(this.key);
+      let jsonValue: string | null;
+      
+      if (isWeb) {
+        // Use localStorage for web
+        jsonValue = localStorage.getItem(this.key);
+      } else {
+        // Use AsyncStorage for native
+        jsonValue = await AsyncStorage.getItem(this.key);
+      }
+      
       return jsonValue != null ? JSON.parse(jsonValue) : null;
     } catch (e) {
       console.error(`Error reading data from ${this.key}:`, e);
@@ -30,20 +59,36 @@ class StorageService<T> {
     }
   }
   
-  // Remove data from storage
+  /**
+   * Remove data from storage
+   */
   async removeData(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(this.key);
+      if (isWeb) {
+        // Use localStorage for web
+        localStorage.removeItem(this.key);
+      } else {
+        // Use AsyncStorage for native
+        await AsyncStorage.removeItem(this.key);
+      }
     } catch (e) {
       console.error(`Error removing data from ${this.key}:`, e);
       throw e;
     }
   }
   
-  // Clear all data (use with caution)
+  /**
+   * Clear all data (use with caution)
+   */
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.clear();
+      if (isWeb) {
+        // Use localStorage for web
+        localStorage.clear();
+      } else {
+        // Use AsyncStorage for native
+        await AsyncStorage.clear();
+      }
     } catch (e) {
       console.error('Error clearing all data:', e);
       throw e;

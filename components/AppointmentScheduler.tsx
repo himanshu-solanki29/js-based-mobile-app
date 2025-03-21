@@ -20,8 +20,8 @@ import {
   List,
   Searchbar
 } from 'react-native-paper';
-import { usePatients, Patient } from '@/utils/patientStore';
-import { addAppointment } from '@/utils/appointmentStore';
+import { Patient } from '@/utils/patientStore';
+import usePatientStorage from '@/utils/usePatientStorage';
 import { ThemedText } from '@/components/ThemedText';
 
 interface AppointmentSchedulerProps {
@@ -49,7 +49,8 @@ export function AppointmentScheduler({
   const theme = useTheme();
   const primaryColor = theme.colors.primary;
   
-  const { patientsArray } = usePatients();
+  // Get patients
+  const { patients, loading } = usePatientStorage();
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -83,15 +84,15 @@ export function AppointmentScheduler({
   
   // Initialize patients list on mount
   useEffect(() => {
-    setFilteredPatients(patientsArray);
-  }, [patientsArray]);
+    setFilteredPatients(patients);
+  }, [patients]);
 
   // Initialize form values when the component becomes visible
   useEffect(() => {
     if (isVisible) {
       // Set patient if patientId is provided
       if (patientId) {
-        const patient = patientsArray.find(p => p.id === patientId);
+        const patient = patients.find(p => p.id === patientId);
         if (patient) {
           setSelectedPatient(patient);
         }
@@ -147,21 +148,21 @@ export function AppointmentScheduler({
       // Set wasVisibleRef to false when component is hidden
       wasVisibleRef.current = false;
     }
-  }, [isVisible, patientId, patientsArray]);
+  }, [isVisible, patientId, patients]);
   
   // Filter patients based on search query
   useEffect(() => {
     if (patientSearch.trim() === '') {
-      setFilteredPatients(patientsArray);
+      setFilteredPatients(patients);
     } else {
       const query = patientSearch.toLowerCase();
-      const filtered = patientsArray.filter(patient => 
+      const filtered = patients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [patientSearch, patientsArray]);
+  }, [patientSearch, patients]);
 
   // Initialize temporary values when opening time picker
   useEffect(() => {
