@@ -13,7 +13,7 @@ export const usePatientStorage = () => {
       try {
         setLoading(true);
         // Get the current patient data
-        const currentPatients = patientStorageService.getPatients();
+        const currentPatients = await patientStorageService.getPatients();
         setPatients(currentPatients);
         setError(null);
       } catch (err) {
@@ -29,8 +29,7 @@ export const usePatientStorage = () => {
 
     // Subscribe to changes
     const unsubscribe = patientStorageService.subscribe(() => {
-      const updatedPatients = patientStorageService.getPatients();
-      setPatients(updatedPatients);
+      loadPatients();
     });
 
     // Cleanup subscription
@@ -62,8 +61,14 @@ export const usePatientStorage = () => {
   };
 
   // Get a patient by ID
-  const getPatientById = (id: string): Patient | null => {
-    return patientStorageService.getPatientById(id);
+  const getPatientById = async (id: string): Promise<Patient | null> => {
+    try {
+      return await patientStorageService.getPatientById(id);
+    } catch (err) {
+      console.error('Error getting patient:', err);
+      setError(err instanceof Error ? err : new Error('Failed to get patient'));
+      return null;
+    }
   };
 
   return {

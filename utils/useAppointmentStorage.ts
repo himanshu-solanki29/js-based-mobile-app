@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import appointmentStorageService from './appointmentStorageService';
-import { Appointment, AppointmentStatus } from './appointmentStore';
+import { Appointment } from './appointmentStore';
 
 // Custom hook for accessing appointment data from storage
 export const useAppointmentStorage = () => {
@@ -13,7 +13,7 @@ export const useAppointmentStorage = () => {
       try {
         setLoading(true);
         // Get the current appointment data
-        const currentAppointments = appointmentStorageService.getAppointments();
+        const currentAppointments = await appointmentStorageService.getAppointments();
         setAppointments(currentAppointments);
         setError(null);
       } catch (err) {
@@ -29,8 +29,7 @@ export const useAppointmentStorage = () => {
 
     // Subscribe to changes
     const unsubscribe = appointmentStorageService.subscribe(() => {
-      const updatedAppointments = appointmentStorageService.getAppointments();
-      setAppointments(updatedAppointments);
+      loadAppointments();
     });
 
     // Cleanup subscription
@@ -38,14 +37,7 @@ export const useAppointmentStorage = () => {
   }, []);
 
   // Add a new appointment
-  const addAppointment = async (appointmentData: {
-    date: Date;
-    time: string;
-    reason: string;
-    notes?: string;
-    patientId: string;
-    status?: AppointmentStatus;
-  }) => {
+  const addAppointment = async (appointmentData: Omit<Appointment, 'id'>) => {
     try {
       const newAppointment = await appointmentStorageService.addAppointment(appointmentData);
       return newAppointment;
@@ -56,18 +48,10 @@ export const useAppointmentStorage = () => {
     }
   };
 
-  // Update appointment status
-  const updateAppointmentStatus = async (
-    appointmentId: string,
-    newStatus: AppointmentStatus,
-    remarks?: string
-  ) => {
+  // Update an appointment status
+  const updateAppointmentStatus = async (id: string, status: Appointment['status']) => {
     try {
-      const updatedAppointment = await appointmentStorageService.updateAppointmentStatus(
-        appointmentId,
-        newStatus,
-        remarks
-      );
+      const updatedAppointment = await appointmentStorageService.updateAppointmentStatus(id, status);
       return updatedAppointment;
     } catch (err) {
       console.error('Error updating appointment status:', err);
@@ -77,40 +61,54 @@ export const useAppointmentStorage = () => {
   };
 
   // Get an appointment by ID
-  const getAppointmentById = (id: string): Appointment | null => {
-    return appointmentStorageService.getAppointmentById(id);
+  const getAppointmentById = async (id: string): Promise<Appointment | null> => {
+    try {
+      return await appointmentStorageService.getAppointmentById(id);
+    } catch (err) {
+      console.error('Error getting appointment:', err);
+      setError(err instanceof Error ? err : new Error('Failed to get appointment'));
+      return null;
+    }
   };
 
   // Get appointments for a patient
-  const getPatientAppointments = (patientId: string): Appointment[] => {
-    return appointmentStorageService.getPatientAppointments(patientId);
-  };
-
-  // Get sorted appointments
-  const getSortedAppointments = (ascending: boolean = true): Appointment[] => {
-    return ascending
-      ? appointmentStorageService.sortAppointmentsByDate(appointments)
-      : appointmentStorageService.sortAppointmentsByDateDesc(appointments);
-  };
-
-  // Filter appointments by status
-  const getAppointmentsByStatus = (status: AppointmentStatus | 'all'): Appointment[] => {
-    if (status === 'all') {
-      return [...appointments];
+  const getPatientAppointments = async (patientId: string): Promise<Appointment[]> => {
+    try {
+      return await appointmentStorageService.getPatientAppointments(patientId);
+    } catch (err) {
+      console.error('Error getting patient appointments:', err);
+      setError(err instanceof Error ? err : new Error('Failed to get patient appointments'));
+      return [];
     }
-    return appointments.filter(appointment => appointment.status === status);
   };
+
+  // Derived appointment lists
+  const upcomingAppointments = useMemo(() => {
+    const now = new Date();
+    return appointments.filter(appointment => {
+      const appointmentDate = new Date(`${appointment.date}T${appointment.time}`);
+      return appointmentDate >= now && appointment.status !== 'cancelled';
+    });
+  }, [appointments]);
+
+  const pastAppointments = useMemo(() => {
+    const now = new Date();
+    return appointments.filter(appointment => {
+      const appointmentDate = new Date(`${appointment.date}T${appointment.time}`);
+      return appointmentDate < now || appointment.status === 'cancelled';
+    });
+  }, [appointments]);
 
   return {
     appointments,
+    upcomingAppointments,
+    pastAppointments,
     loading,
     error,
     addAppointment,
     updateAppointmentStatus,
     getAppointmentById,
-    getPatientAppointments,
-    getSortedAppointments,
-    getAppointmentsByStatus
+    getPatientAppointments
   };
 };
 
