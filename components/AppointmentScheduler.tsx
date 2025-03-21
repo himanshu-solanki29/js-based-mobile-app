@@ -61,6 +61,7 @@ export function AppointmentScheduler({
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const initializedRef = useRef(false);
   const wasVisibleRef = useRef(false);
+  const [isFormValid, setIsFormValid] = useState(false);
   
   // References for ScrollView components to control scroll position
   const hourScrollViewRef = useRef<ScrollView>(null);
@@ -171,6 +172,12 @@ export function AppointmentScheduler({
     }
   }, [showTimePicker, selectedHour, selectedMinute, selectedAmPm]);
 
+  // Validate form whenever relevant fields change
+  useEffect(() => {
+    const valid = !!selectedPatient && reason.trim().length > 0;
+    setIsFormValid(valid);
+  }, [selectedPatient, reason]);
+
   // Function to scroll to center the selected item
   const scrollToSelected = (ref: React.RefObject<ScrollView>, index: number, itemHeight: number) => {
     if (ref.current) {
@@ -206,9 +213,14 @@ export function AppointmentScheduler({
   };
 
   const handleSchedule = () => {
-    // Make sure a patient is selected
+    // Make sure all required fields are filled
     if (!selectedPatient) {
       alert('Please select a patient');
+      return;
+    }
+    
+    if (!reason.trim()) {
+      alert('Please enter a reason for the appointment');
       return;
     }
     
@@ -572,6 +584,7 @@ export function AppointmentScheduler({
                 style={styles.submitButton}
                 buttonColor={primaryColor}
                 textColor="#ffffff"
+                disabled={!isFormValid}
               >
                 Schedule
               </Button>
