@@ -3,7 +3,7 @@ import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme } from 'react-native-paper';
+import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme, Appbar } from 'react-native-paper';
 import { useState, useEffect } from "react";
 import React from 'react';
 
@@ -217,16 +217,13 @@ export default function PatientDetailsScreen() {
         headerShown: false,
       }} />
       
-      <View style={styles.header}>
-        <IconButton 
-          icon="arrow-left" 
-          size={24} 
-          onPress={() => router.back()} 
-          style={styles.backButton} 
+      <Appbar.Header style={styles.appBar}>
+        <Appbar.BackAction color="white" onPress={() => router.back()} />
+        <Appbar.Content 
+          title="Patient Profile" 
+          titleStyle={styles.appBarTitle}
         />
-        <Text style={styles.headerTitle}>Patient Profile</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      </Appbar.Header>
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Patient Profile Card */}
@@ -653,25 +650,14 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingTop: 0,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 0,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    width: '100%',
-    elevation: 2,
+  appBar: {
+    backgroundColor: '#4CAF50',
+    elevation: 4,
   },
-  backButton: {
-    marginLeft: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
+  appBarTitle: {
+    color: 'white',
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#424242',
   },
   profileCard: {
     marginTop: 16,

@@ -275,46 +275,6 @@ export default function AppointmentDetailsScreen() {
           title="Appointment Details" 
           titleStyle={styles.appBarTitle}
         />
-        
-        {/* Status change menu - only show for pending or confirmed appointments */}
-        {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
-          <Menu
-            visible={statusMenuVisible}
-            onDismiss={() => setStatusMenuVisible(false)}
-            anchor={
-              <IconButton 
-                icon="dots-vertical" 
-                iconColor="white" 
-                onPress={() => setStatusMenuVisible(true)}
-              />
-            }
-            contentStyle={styles.statusMenuContent}
-          >
-            {appointment.status === 'pending' && (
-              <Menu.Item 
-                onPress={() => openStatusChangeDialog('confirmed')} 
-                title="Confirm Appointment" 
-                leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-              />
-            )}
-            
-            {appointment.status === 'confirmed' && (
-              <Menu.Item 
-                onPress={() => setMedicalRecordDialogVisible(true)} 
-                title="Complete with Medical Record" 
-                leadingIcon={props => <FontAwesome5 name="notes-medical" size={16} color="#00897B" {...props} />}
-              />
-            )}
-            
-            {appointment.status === 'pending' && (
-              <Menu.Item 
-                onPress={() => openStatusChangeDialog('cancelled')} 
-                title="Cancel Appointment" 
-                leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
-              />
-            )}
-          </Menu>
-        )}
       </Appbar.Header>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 32}}>
