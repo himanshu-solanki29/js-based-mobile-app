@@ -1,6 +1,9 @@
 import StorageService from './storageService';
-import { Appointment, MOCK_APPOINTMENTS, AppointmentStatus } from './appointmentStore';
+import type { Appointment, AppointmentStatus } from './appointmentStore';
 import patientStorageService from './patientStorageService';
+
+// Import only the data, not importing from appointmentStore to avoid circular dependency
+import { INITIAL_APPOINTMENTS } from './initialData';
 
 // Storage keys
 const APPOINTMENT_STORAGE_KEY = 'appointments_data';
@@ -9,54 +12,83 @@ const APPOINTMENT_STORAGE_KEY = 'appointments_data';
 class AppointmentStorageService extends StorageService<Appointment[]> {
   private appointments: Appointment[];
   private listeners: (() => void)[] = [];
+  private initialized: boolean = false;
   
   constructor() {
     super(APPOINTMENT_STORAGE_KEY);
     this.appointments = [];
-    this.initialize();
+    this.initialize().catch(err => {
+      console.error('Failed to initialize appointment storage:', err);
+    });
   }
   
   // Initialize the storage with default data if empty
-  private async initialize() {
-    const storedData = await this.getData();
+  async initialize() {
+    if (this.initialized) return;
     
-    if (storedData && storedData.length > 0) {
-      this.appointments = storedData;
-    } else {
-      // Use initial data for first-time setup
-      this.appointments = MOCK_APPOINTMENTS;
-      await this.saveData(this.appointments);
+    try {
+      const storedData = await this.getData();
+      
+      if (storedData && storedData.length > 0) {
+        this.appointments = storedData;
+      } else {
+        // Use initial data for first-time setup
+        this.appointments = INITIAL_APPOINTMENTS;
+        await this.saveData(this.appointments);
+      }
+      
+      this.initialized = true;
+      // Notify listeners of initialization
+      this.notifyListeners();
+    } catch (error) {
+      console.error('Error initializing appointment storage:', error);
+      // Still mark as initialized to prevent further initialization attempts
+      this.initialized = true;
+      // Use default data if there was an error
+      this.appointments = INITIAL_APPOINTMENTS;
     }
-    
-    // Notify listeners of initialization
-    this.notifyListeners();
+  }
+  
+  // Ensure storage is initialized before accessing data
+  private async ensureInitialized() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
   }
   
   // Save appointments to AsyncStorage
   private async persistAppointments() {
-    await this.saveData(this.appointments);
-    this.notifyListeners();
+    await this.ensureInitialized();
+    try {
+      await this.saveData(this.appointments);
+      this.notifyListeners();
+    } catch (error) {
+      console.error('Error persisting appointments:', error);
+    }
   }
   
   // Get all appointments
-  getAppointments(): Appointment[] {
+  async getAppointments(): Promise<Appointment[]> {
+    await this.ensureInitialized();
     return [...this.appointments];
   }
   
   // Get a specific appointment by ID
-  getAppointmentById(id: string): Appointment | null {
+  async getAppointmentById(id: string): Promise<Appointment | null> {
+    await this.ensureInitialized();
     const appointment = this.appointments.find(a => a.id === id);
     return appointment || null;
   }
   
   // Get patient appointments
-  getPatientAppointments(patientId: string): Appointment[] {
+  async getPatientAppointments(patientId: string): Promise<Appointment[]> {
+    await this.ensureInitialized();
     return this.appointments.filter(a => a.patientId === patientId);
   }
   
   // Helper function to get patient name
-  private getPatientName(patientId: string): string {
-    const patient = patientStorageService.getPatientById(patientId);
+  private async getPatientName(patientId: string): Promise<string> {
+    const patient = await patientStorageService.getPatientById(patientId);
     return patient ? patient.name : 'Unknown Patient';
   }
   
@@ -69,11 +101,13 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     patientId: string;
     status?: AppointmentStatus;
   }): Promise<Appointment> {
+    await this.ensureInitialized();
+    
     // Create a new appointment object
     const newAppointment: Appointment = {
       id: (this.appointments.length + 1).toString(),
       patientId: appointmentData.patientId,
-      patientName: this.getPatientName(appointmentData.patientId),
+      patientName: await this.getPatientName(appointmentData.patientId),
       date: appointmentData.date.toISOString().split('T')[0],
       time: appointmentData.time,
       reason: appointmentData.reason,
@@ -144,6 +178,8 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     newStatus: AppointmentStatus, 
     remarks?: string
   ): Promise<Appointment | null> {
+    await this.ensureInitialized();
+    
     // Find the appointment
     const appointmentIndex = this.appointments.findIndex(a => a.id === appointmentId);
     if (appointmentIndex === -1) return null;
@@ -161,7 +197,7 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     
     // If the new status is 'completed', update the patient history
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-      const patient = patientStorageService.getPatientById(appointment.patientId);
+      const patient = await patientStorageService.getPatientById(appointment.patientId);
       if (patient) {
         // Initialize with default values
         const medicalRecord = {

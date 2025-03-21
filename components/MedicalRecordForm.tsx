@@ -19,6 +19,7 @@ interface MedicalRecordFormProps {
   submitButtonText?: string;
   disabled?: boolean;
   loading?: boolean;
+  hideSubmitButton?: boolean;
 }
 
 export function MedicalRecordForm({ 
@@ -26,7 +27,8 @@ export function MedicalRecordForm({
   onSubmit, 
   submitButtonText = 'Submit',
   disabled = false,
-  loading = false
+  loading = false,
+  hideSubmitButton = false
 }: MedicalRecordFormProps) {
   const [medicalRecord, setMedicalRecord] = useState<MedicalRecord>({
     complaint: initialValues.complaint || '',
@@ -114,16 +116,18 @@ export function MedicalRecordForm({
           disabled={disabled}
         />
         
-        <Button 
-          mode="contained"
-          onPress={handleSubmit}
-          style={styles.submitButton}
-          buttonColor="#4CAF50"
-          disabled={disabled}
-          loading={loading}
-        >
-          {submitButtonText}
-        </Button>
+        {!hideSubmitButton && (
+          <Button 
+            mode="contained"
+            onPress={handleSubmit}
+            style={styles.submitButton}
+            buttonColor="#4CAF50"
+            disabled={disabled}
+            loading={loading}
+          >
+            {submitButtonText}
+          </Button>
+        )}
       </View>
     </Surface>
   );

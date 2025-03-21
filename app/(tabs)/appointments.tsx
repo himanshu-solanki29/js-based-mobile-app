@@ -71,9 +71,7 @@ export default function AppointmentsScreen() {
     loading,
     error,
     addAppointment,
-    updateAppointmentStatus,
-    getSortedAppointments,
-    getAppointmentsByStatus
+    updateAppointmentStatus
   } = useAppointmentStorage();
   
   const router = useRouter();
@@ -450,7 +448,7 @@ export default function AppointmentsScreen() {
       <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
         <ThemedText style={[styles.statusText, { color: colors.text }]}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
-        </ThemedText>
+            </ThemedText>
       </View>
     );
   };
@@ -475,7 +473,7 @@ export default function AppointmentsScreen() {
           const nonSelectedText = '#616161';
           
           return (
-            <TouchableOpacity
+            <TouchableOpacity 
               key={option}
               onPress={() => {
                 console.log(`Setting status to: ${option}`);
@@ -511,7 +509,7 @@ export default function AppointmentsScreen() {
                 >
                   {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
                 </Text>
-              </View>
+        </View>
             </TouchableOpacity>
           );
         })}
@@ -519,26 +517,55 @@ export default function AppointmentsScreen() {
     );
   };
 
+  // Add state for storing patient names
+  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
+
+  // Fetch patient names when appointments change
+  useEffect(() => {
+    const fetchPatientNames = async () => {
+      const namePromises = appointments.map(async (appointment) => {
+        try {
+          const name = await getPatientName(appointment.patientId);
+          return [appointment.patientId, name];
+        } catch (error) {
+          console.error('Error fetching patient name:', error);
+          return [appointment.patientId, 'Unknown'];
+        }
+      });
+
+      const names = await Promise.all(namePromises);
+      const nameMap = Object.fromEntries(names);
+      setPatientNames(nameMap);
+    };
+
+    fetchPatientNames();
+  }, [appointments]);
+
   // Update the renderAppointmentItem to remove the 3-dots menu and use consistent colors
   const renderAppointmentItem = ({ item }: { item: Appointment }) => {
-    // Ensure we're always using the latest patient name from the store
-    const patientName = getPatientName(item.patientId);
+    // Use the patientName from our local state, or fall back to the one in the appointment
+    const patientName = patientNames[item.patientId] || item.patientName || 'Unknown Patient';
     
     // Get status colors
     const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.confirmed;
     
     // Function to handle appointment status change directly from the card
-    const handleStatusChange = (newStatus: AppointmentStatus) => {
-      updateAppointmentStatus(item.id, newStatus);
-      
-      // Trigger a refresh to update the UI
-      setRefreshTrigger(prev => prev + 1);
-      
-      // Show toast notification
-      showToast(
-        `Appointment status updated to ${newStatus}`,
-        'success'
-      );
+    const handleStatusChange = async (newStatus: AppointmentStatus) => {
+      try {
+        await updateAppointmentStatus(item.id, newStatus);
+        
+        // Trigger a refresh to update the UI
+        setRefreshTrigger(prev => prev + 1);
+        
+        // Show toast notification
+        showToast(
+          `Appointment status updated to ${newStatus}`,
+          'success'
+        );
+      } catch (error) {
+        console.error('Error updating appointment status:', error);
+        showToast('Failed to update appointment status', 'error');
+      }
     };
     
     return (
@@ -548,7 +575,7 @@ export default function AppointmentsScreen() {
         style={{ borderRadius: 16, marginBottom: 12 }}
       >
         <Card 
-          style={styles.appointmentCard}
+      style={styles.appointmentCard}
           mode="elevated"
         >
           <Card.Content style={styles.cardContent}>
@@ -568,10 +595,10 @@ export default function AppointmentsScreen() {
                   { color: statusColors.text }
                 ]}>
                   {new Date(item.date).toLocaleString('default', { month: 'short' })}
-                </ThemedText>
-              </View>
-              
-              <View style={styles.appointmentDetails}>
+          </ThemedText>
+      </View>
+      
+      <View style={styles.appointmentDetails}>
                 <View style={styles.appointmentHeaderInner}>
                   <ThemedText style={styles.patientName}>{patientName}</ThemedText>
                   <TouchableRipple
@@ -587,7 +614,7 @@ export default function AppointmentsScreen() {
                   >
                     {renderStatusBadge(item.status)}
                   </TouchableRipple>
-                </View>
+        </View>
                 <ThemedText style={styles.appointmentTime}>
                   <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
                 </ThemedText>
@@ -597,17 +624,17 @@ export default function AppointmentsScreen() {
                   <View style={{marginTop: 8}}>
                     <ThemedText style={styles.notesLabel}>Notes:</ThemedText>
                     <ThemedText style={styles.notesText}>{item.notes}</ThemedText>
-                  </View>
+        </View>
                 )}
-              </View>
-            </View>
+        </View>
+      </View>
           </Card.Content>
         </Card>
       </TouchableRipple>
     );
   };
 
-  const handleScheduleAppointment = (appointmentData: {
+  const handleScheduleAppointment = async (appointmentData: {
     date: Date;
     time: string;
     reason: string;
@@ -615,27 +642,32 @@ export default function AppointmentsScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    // Create new appointment with pending status
-    const newAppointment = addAppointment({
-      date: appointmentData.date,
+    try {
+      // Create new appointment with pending status
+      const newAppointment = await addAppointment({
+        date: appointmentData.date,
       time: appointmentData.time,
       reason: appointmentData.reason,
-      notes: appointmentData.notes || '',
-      patientId: appointmentData.patientId,
+        notes: appointmentData.notes || '',
+        patientId: appointmentData.patientId,
       status: 'pending'
-    });
-    
-    // Trigger a refresh to update the UI
-    setRefreshTrigger(prev => prev + 1);
-    
-    // Close dialog
-    setSchedulerVisible(false);
-    
-    // Show toast notification
-    showToast(
-      `Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
-      'success'
-    );
+      });
+      
+      // Trigger a refresh to update the UI
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Close dialog
+      setSchedulerVisible(false);
+      
+      // Show toast notification
+      showToast(
+        `Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Error adding appointment:', error);
+      showToast('Failed to schedule appointment', 'error');
+    }
   };
 
   return (
@@ -751,20 +783,28 @@ export default function AppointmentsScreen() {
               No
             </Button>
             <Button 
-              onPress={() => {
+              onPress={async () => {
                 if (appointmentToComplete) {
-                  // Update the appointment status and patient history
-                  updateAppointmentStatus(
-                    appointmentToComplete.id, 
-                    'completed', 
-                    completionRemarks.trim()
-                  );
-                  
-                  // Update the filtered list
-                  setFilteredAppointments([...filteredAppointments]);
-                  
-                  // Close dialog
-                  setCompletionDialogVisible(false);
+                  try {
+                    // Update the appointment status and patient history
+                    await updateAppointmentStatus(
+                      appointmentToComplete.id, 
+                      'completed', 
+                      completionRemarks.trim()
+                    );
+                    
+                    // Update the filtered list
+                    setFilteredAppointments([...filteredAppointments]);
+                    
+                    // Close dialog
+                    setCompletionDialogVisible(false);
+                    
+                    // Show success message
+                    showToast('Appointment completed successfully', 'success');
+                  } catch (error) {
+                    console.error('Error completing appointment:', error);
+                    showToast('Failed to complete appointment', 'error');
+                  }
                 }
               }}
               mode="contained" 

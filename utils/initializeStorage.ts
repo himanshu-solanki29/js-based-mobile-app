@@ -6,6 +6,12 @@ import { Platform } from 'react-native';
 // Check if running on web
 const isWeb = Platform.OS === 'web';
 
+// Check if we're in a browser environment where localStorage is available
+const isBrowser = isWeb && typeof window !== 'undefined' && window.localStorage;
+
+// Memory fallback for server-side rendering
+const memoryStorage: Record<string, string> = {};
+
 // Function to check if this is the first app launch
 const isFirstLaunch = async (): Promise<boolean> => {
   try {
@@ -13,8 +19,13 @@ const isFirstLaunch = async (): Promise<boolean> => {
     let value: string | null;
     
     if (isWeb) {
-      // Use localStorage on web
-      value = localStorage.getItem(APP_FIRST_LAUNCH_KEY);
+      if (isBrowser) {
+        // Use localStorage on web in browser
+        value = window.localStorage.getItem(APP_FIRST_LAUNCH_KEY);
+      } else {
+        // Use memory storage for SSR
+        value = memoryStorage[APP_FIRST_LAUNCH_KEY] || null;
+      }
     } else {
       // Use AsyncStorage on native
       value = await AsyncStorage.getItem(APP_FIRST_LAUNCH_KEY);
@@ -33,8 +44,13 @@ const markAsLaunched = async (): Promise<void> => {
     const APP_FIRST_LAUNCH_KEY = '@app_first_launch';
     
     if (isWeb) {
-      // Use localStorage on web
-      localStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
+      if (isBrowser) {
+        // Use localStorage on web in browser
+        window.localStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
+      } else {
+        // Use memory storage for SSR
+        memoryStorage[APP_FIRST_LAUNCH_KEY] = 'false';
+      }
     } else {
       // Use AsyncStorage on native
       await AsyncStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');

@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert, ActivityIndicator, Text } from "react-native";
+import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
@@ -14,21 +14,24 @@ import {
   SegmentedButtons,
   Dialog,
   Menu,
-  IconButton
+  IconButton,
+  Badge,
+  Portal,
+  ActivityIndicator
 } from 'react-native-paper';
 
 import { 
   MOCK_APPOINTMENTS, 
   Appointment, 
   updateAppointmentStatus, 
-  getPatientName,
-  useAppointments
+  getPatientName 
 } from "@/utils/appointmentStore";
 import { getPatientById } from "@/utils/patientStore";
 import { AppointmentStatus } from "@/utils/types";
 import { MedicalRecordForm } from "@/components/MedicalRecordForm";
 import { MedicalRecordCard } from "@/components/MedicalRecordCard";
 import { useGlobalToast } from "@/components/GlobalToastProvider";
+import LottieView from 'lottie-react-native';
 
 // Define status colors for consistent styling
 const STATUS_COLORS = {
@@ -70,9 +73,6 @@ export default function AppointmentDetailsScreen() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // Use the appointments hook to get live data
-  const { appointments, loading: appointmentsLoading } = useAppointments();
-  
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -102,6 +102,8 @@ export default function AppointmentDetailsScreen() {
   const [completeDialogVisible, setCompleteDialogVisible] = useState(false);
   const [completeNotes, setCompleteNotes] = useState("");
   
+  const animationRef = useRef<LottieView>(null);
+  
   // This effect is triggered when appointment status changes and updates all states
   useEffect(() => {
     if (appointment) {
@@ -110,239 +112,138 @@ export default function AppointmentDetailsScreen() {
     }
   }, [appointment?.status]);
   
-  // Load appointment data whenever the ID changes or when refreshKey changes
   useEffect(() => {
-    const loadAppointment = async () => {
-      if (!id || appointmentsLoading) return;
-      
-      setLoading(true);
-      console.log(`[AppointmentDetails] Loading appointment with ID: ${id}, refreshKey: ${refreshKey}`);
-      
+    const loadAppointmentData = async () => {
       try {
-        // Find the appointment using the ID from the parameters
-        const foundAppointment = appointments.find(a => a.id === id);
+        setLoading(true);
+        // Find the appointment
+        const foundAppointment = await getAppointmentById(id);
         
         if (foundAppointment) {
-          console.log(`[AppointmentDetails] Found appointment: ${foundAppointment.id}, status: ${foundAppointment.status}`);
           setAppointment(foundAppointment);
-          
-          // Get the patient data for this appointment
-          const patient = await getPatientById(foundAppointment.patientId);
-          if (patient) {
-            console.log(`[AppointmentDetails] Found patient: ${patient.id}, name: ${patient.name}`);
-            setPatient(patient);
+          // Get patient data
+          const patientData = await getPatientById(foundAppointment.patientId);
+          if (patientData) {
+            setPatient(patientData);
             
             // Pre-fill medical record form with patient's current data
             setMedicalRecord(prev => ({
               ...prev,
-              complaint: foundAppointment.reason || "", // Use reason as initial complaint
-              bloodPressure: patient.bloodPressure || "",
-              weight: patient.weight || "",
-              diagnosis: "", // Start with empty diagnosis
-              prescription: "" // Start with empty prescription
+              complaint: foundAppointment.reason, // Use reason as initial complaint
+              bloodPressure: patientData.bloodPressure || "",
+              weight: patientData.weight || ""
             }));
-          } else {
-            console.warn(`[AppointmentDetails] Patient not found for ID: ${foundAppointment.patientId}`);
-            setPatient(null);
           }
-        } else {
-          console.error(`[AppointmentDetails] Appointment with ID ${id} not found in ${appointments.length} appointments`);
-          showToast(`Appointment #${id} not found`, "error");
-          setAppointment(null);
-          setPatient(null);
         }
       } catch (error) {
-        console.error('[AppointmentDetails] Error loading appointment data:', error);
-        showToast("Failed to load appointment details", "error");
-        setAppointment(null);
-        setPatient(null);
+        console.error('Error loading appointment:', error);
       } finally {
         setLoading(false);
       }
     };
-
-    loadAppointment();
-  }, [id, appointments, refreshKey, appointmentsLoading]);
-  
-  // Make sure UI updates immediately when appointment status changes
-  useEffect(() => {
-    if (appointment) {
-      console.log("Appointment status:", appointment.status);
-      setActionInProgress(false);
-    }
-  }, [appointment?.status]);
-  
-  // Add a timer to periodically refresh the appointment data
-  useEffect(() => {
-    // Set up a timer to refresh the appointment data every 2 seconds
-    // This ensures we catch any updates made elsewhere
-    const timer = setInterval(() => {
-      setRefreshKey(prevKey => prevKey + 1);
-    }, 2000);
     
-    // Clean up the timer when the component unmounts
-    return () => clearInterval(timer);
-  }, []);
+    loadAppointmentData();
+  }, [id, refreshKey, getAppointmentById, getPatientById]);
   
   // Function to handle completion with medical record
   const handleCompletionWithMedicalRecord = async (medicalData: MedicalRecord) => {
     if (!appointment) return;
     
-    // Only allow completing confirmed appointments
-    if (appointment.status !== 'confirmed') {
-      showToast("Only confirmed appointments can be completed", "warning");
-      return;
-    }
-    
-    // Show confirmation dialog
-    setMedicalRecord(medicalData);
-    setCompleteDialogVisible(true);
-  };
-
-  // Function to execute the appointment completion
-  const executeCompletion = async (medicalRecordData?: MedicalRecord) => {
-    // Show status change animation
+    // Disable actions while in progress
     setActionInProgress(true);
     
+    // Create combined note with medical record information
+    const medicalRecordNote = `Complaint: ${medicalData.complaint}\nDiagnosis: ${medicalData.diagnosis}\nBlood Pressure: ${medicalData.bloodPressure}\nWeight: ${medicalData.weight}\nPrescription: ${medicalData.prescription}`;
+    
     try {
-      const medicalRecordNote = medicalRecordData 
-        ? `Complaint: ${medicalRecordData.complaint}\nDiagnosis: ${medicalRecordData.diagnosis}\nBlood Pressure: ${medicalRecordData.bloodPressure}\nWeight: ${medicalRecordData.weight}\nPrescription: ${medicalRecordData.prescription}`
-        : appointment?.notes || '';
-      
-      // Update the appointment status through the storage service
-      const updatedAppointment = await updateAppointmentStatus(
-        appointment?.id || '',
+      // Update appointment status to completed with medical record
+      await updateAppointmentStatus(
+        appointment.id,
         'completed',
         medicalRecordNote
       );
       
-      if (updatedAppointment) {
-        console.log('Successfully completed appointment:', updatedAppointment.id);
-        console.log('New status:', updatedAppointment.status);
-        
-        // Update the local state immediately
-        setAppointment({
-          ...updatedAppointment
-        });
-        
-        // Force a refresh of the component
-        setRefreshKey(old => old + 1);
-        
-        // Show animation for status change
-        setStatusChanged(true);
-        setTimeout(() => setStatusChanged(false), 2000);
-        
-        // Show success notification
-        showToast("Appointment completed successfully", "success");
-      } else {
-        console.error('Failed to complete appointment - no appointment returned');
-        showToast("Failed to complete appointment. Please try again.", "error");
+      // Show status changed animation
+      setStatusChanged(true);
+      
+      if (animationRef.current) {
+        animationRef.current.play();
       }
+      
+      // Reset medical record dialog
+      setMedicalRecordDialogVisible(false);
+      
+      // Refresh appointment
+      setTimeout(() => {
+        setRefreshKey(prev => prev + 1);
+        setStatusChanged(false);
+      }, 1500);
+      
+      // Show success message
+      showToast('Appointment completed with medical record', 'success');
     } catch (error) {
       console.error('Error completing appointment:', error);
-      showToast("An error occurred while completing the appointment.", "error");
-    } finally {
       setActionInProgress(false);
-      setCompleteDialogVisible(false);
+      showToast('Failed to complete appointment', 'error');
     }
   };
   
-  // Function to handle general status change
-  const handleStatusChange = async (newStatus: AppointmentStatus, notes?: string) => {
-    // Show status change animation
-    setActionInProgress(true);
-    
-    try {
-      // Update the appointment status through the storage service
-      const updatedAppointment = await updateAppointmentStatus(
-        appointment?.id || '',
-        newStatus,
-        notes || appointment?.notes
-      );
-      
-      if (updatedAppointment) {
-        console.log('Successfully updated appointment status:', updatedAppointment.id);
-        console.log('New status:', updatedAppointment.status);
-        
-        // Update the local state immediately
-        setAppointment({
-          ...updatedAppointment
-        });
-        
-        // Force a refresh of the component
-        setRefreshKey(old => old + 1);
-        
-        // Show success notification with appropriate message
-        let message = '';
-        if (newStatus === 'confirmed') {
-          message = 'Appointment confirmed successfully.';
-        } else if (newStatus === 'cancelled') {
-          message = 'Appointment cancelled successfully.';
-        } else if (newStatus === 'pending') {
-          message = 'Appointment marked as pending.';
-        } else {
-          message = `Appointment status updated to ${newStatus}.`;
-        }
-        
-        showToast(message, "success");
-      } else {
-        console.error('Failed to update appointment status - no appointment returned');
-        showToast("Failed to update appointment status. Please try again.", "error");
-      }
-    } catch (error) {
-      console.error('Error updating appointment status:', error);
-      showToast("An error occurred while updating the appointment.", "error");
-    } finally {
-      setActionInProgress(false);
-      setStatusChangeDialogVisible(false);
-    }
+  // Handlers for medical record form fields
+  const handleMedicalRecordChange = (field: keyof MedicalRecord, value: string) => {
+    setMedicalRecord(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
   
-  const handleCompleteAppointment = async () => {
-    if (!appointment) return;
+  // Function to handle changing appointment status
+  const handleStatusChange = async () => {
+    if (!appointment || !selectedStatus) return;
     
     // Disable actions while in progress
     setActionInProgress(true);
     
     try {
       // Update appointment status
-      const updatedAppointment = await updateAppointmentStatus(
+      await updateAppointmentStatus(
         appointment.id,
-        'completed',
-        completeNotes
+        selectedStatus,
+        statusChangeNotes
       );
       
-      if (updatedAppointment) {
-        // Show status changed animation
-        setStatusChanged(true);
-        setTimeout(() => setStatusChanged(false), 2000);
-        
-        // Update local state
-        setAppointment(updatedAppointment);
-        
-        // Trigger a refresh to make sure all components using the appointments data are updated
-        setRefreshKey(prev => prev + 1);
-        
-        // Show success notification
-        showToast(`Appointment has been completed`, "success");
-        
-        // Reset form state
-        setCompleteDialogVisible(false);
-        setCompleteNotes("");
-      } else {
-        // Show error notification
-        showToast("Failed to update appointment status", "error");
+      // Show status changed animation
+      setStatusChanged(true);
+      
+      if (animationRef.current) {
+        animationRef.current.play();
       }
+      
+      // Reset dialog
+      setStatusChangeDialogVisible(false);
+      setSelectedStatus(null);
+      setStatusChangeNotes("");
+      
+      // Refresh appointment
+      setTimeout(() => {
+        setRefreshKey(prev => prev + 1);
+        setStatusChanged(false);
+      }, 1500);
+      
+      // Show success message
+      showToast(`Appointment ${selectedStatus}`, 'success');
     } catch (error) {
-      console.error('Error completing appointment:', error);
-      showToast("Failed to update appointment status", "error");
-    } finally {
+      console.error('Error updating appointment status:', error);
       setActionInProgress(false);
+      showToast('Failed to update appointment status', 'error');
     }
+  };
+  
+  const handleCompleteAppointment = () => {
+    setCompleteDialogVisible(true);
   };
 
   const handleCancelAppointment = () => {
-    openStatusChangeDialog('cancelled');
+    handleStatusChange();
   };
   
   // Helper to open status change dialog
@@ -398,19 +299,8 @@ export default function AppointmentDetailsScreen() {
   }
   
   // Format appointment date
-  const formattedDate = formatDate(appointment?.date || '');
-  const formattedDateTime = appointment ? `${formattedDate} at ${appointment.time}` : '';
-  
-  // Add more logging to debug the UI rendering
-  console.log("Rendering appointment details:", {
-    id: appointment?.id,
-    status: appointment?.status,
-    hasNotes: !!appointment?.notes,
-    isConfirmed: appointment?.status === 'confirmed',
-    isCompleted: appointment?.status === 'completed',
-    isPending: appointment?.status === 'pending',
-    refreshKey
-  });
+  const formattedDate = formatDate(appointment.date);
+  const formattedDateTime = `${formattedDate} at ${appointment.time}`;
   
   return (
     <ThemedView style={styles.container}>
@@ -543,26 +433,23 @@ export default function AppointmentDetailsScreen() {
         </Surface>
         
         {/* Medical Record Card - only show for completed appointments */}
-        {appointment?.status === 'completed' && appointment.notes && (
+        {appointment.status === 'completed' && appointment.notes && (
           <MedicalRecordCard notes={appointment.notes} />
         )}
         
-        {/* Medical Record Form for confirmed appointments ONLY */}
-        {appointment?.status === 'confirmed' && (
+        {/* Medical Record Form for confirmed appointments */}
+        {appointment.status === 'confirmed' && (
           <MedicalRecordForm
-            key={`med-record-form-${appointment.status}-${refreshKey}`}
+            key={`med-record-form-${appointment.status}`}
             initialValues={{
               complaint: appointment.reason,
-              bloodPressure: patient?.bloodPressure || '',
-              weight: patient?.weight || '',
+              bloodPressure: patient.bloodPressure || '',
+              weight: patient.weight || '',
             }}
-            onSubmit={(data) => {
-              // Just capture the data
-              setMedicalRecord(data);
-            }}
-            disabled={false}  // Make fields editable
+            onSubmit={handleCompletionWithMedicalRecord}
+            submitButtonText="Complete Appointment"
+            disabled={actionInProgress}
             loading={actionInProgress}
-            hideSubmitButton={true}  // Hide the submit button
           />
         )}
         
@@ -578,8 +465,7 @@ export default function AppointmentDetailsScreen() {
             Back
           </Button>
           
-          {/* Only show pending actions if the appointment is pending */}
-          {appointment?.status === 'pending' && !actionInProgress && (
+          {appointment.status === 'pending' && !actionInProgress && (
             <View style={styles.buttonGroup}>
               <Button 
                 mode="outlined"
@@ -604,9 +490,8 @@ export default function AppointmentDetailsScreen() {
               </Button>
             </View>
           )}
-          
-          {/* Only show completion action if the appointment is confirmed */}
-          {appointment?.status === 'confirmed' && !actionInProgress && (
+
+          {appointment.status === 'confirmed' && !actionInProgress && (
             <View style={styles.buttonGroup}>
               <Button 
                 mode="outlined"
@@ -619,13 +504,13 @@ export default function AppointmentDetailsScreen() {
                 Cancel
               </Button>
               <Button 
-                onPress={() => setCompleteDialogVisible(true)}
-                mode="contained" 
+                mode="contained"
+                icon={() => <FontAwesome5 name="check-circle" size={16} color="#FFFFFF" />}
+                style={styles.confirmButton}
                 buttonColor="#4CAF50"
-                textColor="white"
-                style={styles.actionButton}
-                icon="check-circle"
-                disabled={appointment?.status !== 'confirmed' || actionInProgress}
+                textColor="#FFFFFF"
+                onPress={() => setCompleteDialogVisible(true)}
+                disabled={actionInProgress}
               >
                 Complete
               </Button>
@@ -634,129 +519,149 @@ export default function AppointmentDetailsScreen() {
         </Surface>
       </ScrollView>
       
-      {/* Dialog for status change */}
-      <Dialog visible={statusChangeDialogVisible} onDismiss={() => !actionInProgress && setStatusChangeDialogVisible(false)} style={styles.dialog}>
-        <Dialog.Title style={styles.dialogTitle}>
-          <FontAwesome5 
-            name={
-              selectedStatus === 'confirmed' ? 'check-circle' : 
-              selectedStatus === 'cancelled' ? 'times-circle' : 
-              selectedStatus === 'pending' ? 'clock' : 'calendar-check'
-            } 
-            size={16} 
-            color={STATUS_COLORS[selectedStatus]?.accent || '#757575'} 
-            style={{marginRight: 6}} 
-          />
-          {selectedStatus === 'confirmed' ? 'Confirm Appointment' :
-           selectedStatus === 'cancelled' ? 'Cancel Appointment' :
-           selectedStatus === 'pending' ? 'Restore Appointment' : 'Change Status'}
-        </Dialog.Title>
-        
-        <Dialog.Content>
-          <ThemedText style={styles.dialogText}>
-            {selectedStatus === 'confirmed' ? 'Are you sure you want to confirm this appointment?' :
-             selectedStatus === 'cancelled' ? 'Are you sure you want to cancel this appointment?' :
-             selectedStatus === 'pending' ? 'Restore this appointment to pending status?' :
-             'Change the status of this appointment?'}
-          </ThemedText>
-          
-          <TextInput
-            label="Notes (optional)"
-            value={statusChangeNotes}
-            onChangeText={setStatusChangeNotes}
-            mode="outlined"
-            style={styles.input}
-            multiline
-            numberOfLines={2}
-            outlineColor="#E0E0E0"
-            activeOutlineColor="#4CAF50"
-            disabled={actionInProgress}
-          />
-        </Dialog.Content>
-        
-        <Dialog.Actions style={styles.dialogActions}>
-          <Button 
-            onPress={() => setStatusChangeDialogVisible(false)} 
-            textColor="#757575"
-            disabled={actionInProgress}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onPress={() => handleStatusChange(selectedStatus, statusChangeNotes)}
-            mode="contained"
-            buttonColor={STATUS_COLORS[selectedStatus]?.accent || '#757575'}
-            style={{borderRadius: 8}}
-            disabled={actionInProgress}
-            loading={actionInProgress}
-          >
-            {selectedStatus === 'confirmed' ? 'Confirm' :
+      {/* Status Change Dialog */}
+      <Portal>
+        <Dialog 
+          visible={statusChangeDialogVisible} 
+          onDismiss={() => !actionInProgress && setStatusChangeDialogVisible(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>
+            <FontAwesome5 
+              name={
+                selectedStatus === 'confirmed' ? 'check-circle' : 
+                selectedStatus === 'cancelled' ? 'times-circle' : 
+                selectedStatus === 'pending' ? 'clock' : 'calendar-check'
+              } 
+              size={16} 
+              color={STATUS_COLORS[selectedStatus]?.accent || '#757575'} 
+              style={{marginRight: 6}} 
+            />
+            {selectedStatus === 'confirmed' ? 'Confirm Appointment' :
              selectedStatus === 'cancelled' ? 'Cancel Appointment' :
-             selectedStatus === 'pending' ? 'Restore' : 'Change Status'}
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-      
-      {/* Complete Appointment Confirmation Dialog */}
-      <Dialog 
-        visible={completeDialogVisible} 
-        onDismiss={() => !actionInProgress && setCompleteDialogVisible(false)}
-        style={styles.dialog}
-      >
-        <Dialog.Title style={styles.dialogTitle}>
-          <FontAwesome5 
-            name="check-circle" 
-            size={16} 
-            color="#4CAF50" 
-            style={{marginRight: 6}} 
-          />
-          Complete Appointment
-        </Dialog.Title>
-        
-        <Dialog.Content>
-          <ThemedText style={styles.dialogText}>
-            Are you sure you want to complete this appointment with the medical record information you've entered?
-          </ThemedText>
+             selectedStatus === 'pending' ? 'Restore Appointment' : 'Change Status'}
+          </Dialog.Title>
           
-          <View style={styles.medicalSummary}>
-            <ThemedText style={styles.medicalSummaryItem}>
-              <ThemedText style={styles.medicalSummaryLabel}>Complaint:</ThemedText> {medicalRecord.complaint || 'None'}
+          <Dialog.Content>
+            <ThemedText style={styles.dialogText}>
+              {selectedStatus === 'confirmed' ? 'Are you sure you want to confirm this appointment?' :
+               selectedStatus === 'cancelled' ? 'Are you sure you want to cancel this appointment?' :
+               selectedStatus === 'pending' ? 'Restore this appointment to pending status?' :
+               'Change the status of this appointment?'}
             </ThemedText>
-            <ThemedText style={styles.medicalSummaryItem}>
-              <ThemedText style={styles.medicalSummaryLabel}>Diagnosis:</ThemedText> {medicalRecord.diagnosis || 'None'}
+            
+            <TextInput
+              label="Notes (optional)"
+              value={statusChangeNotes}
+              onChangeText={setStatusChangeNotes}
+              mode="outlined"
+              style={styles.input}
+              multiline
+              numberOfLines={2}
+              outlineColor="#E0E0E0"
+              activeOutlineColor="#4CAF50"
+              disabled={actionInProgress}
+            />
+          </Dialog.Content>
+          
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button 
+              onPress={() => setStatusChangeDialogVisible(false)} 
+              textColor="#757575"
+              disabled={actionInProgress}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onPress={handleStatusChange}
+              mode="contained"
+              buttonColor={STATUS_COLORS[selectedStatus]?.accent || '#757575'}
+              style={{borderRadius: 8}}
+              disabled={actionInProgress}
+              loading={actionInProgress}
+            >
+              {selectedStatus === 'confirmed' ? 'Confirm' :
+               selectedStatus === 'cancelled' ? 'Cancel Appointment' :
+               selectedStatus === 'pending' ? 'Restore' : 'Change Status'}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      
+      {/* Complete Appointment Dialog */}
+      <Portal>
+        <Dialog 
+          visible={completeDialogVisible} 
+          onDismiss={() => !actionInProgress && setCompleteDialogVisible(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>
+            <FontAwesome5 
+              name="check-circle" 
+              size={16} 
+              color="#4CAF50" 
+              style={{marginRight: 6}} 
+            />
+            Complete Appointment
+          </Dialog.Title>
+          
+          <Dialog.Content>
+            <ThemedText style={styles.dialogText}>
+              Are you sure you want to mark this appointment as completed?
             </ThemedText>
-            <ThemedText style={styles.medicalSummaryItem}>
-              <ThemedText style={styles.medicalSummaryLabel}>Blood Pressure:</ThemedText> {medicalRecord.bloodPressure || 'Not recorded'}
-            </ThemedText>
-            <ThemedText style={styles.medicalSummaryItem}>
-              <ThemedText style={styles.medicalSummaryLabel}>Weight:</ThemedText> {medicalRecord.weight || 'Not recorded'}
-            </ThemedText>
-            <ThemedText style={styles.medicalSummaryItem}>
-              <ThemedText style={styles.medicalSummaryLabel}>Prescription:</ThemedText> {medicalRecord.prescription || 'None'}
-            </ThemedText>
-          </View>
-        </Dialog.Content>
-        
-        <Dialog.Actions style={styles.dialogActions}>
-          <Button 
-            onPress={() => setCompleteDialogVisible(false)} 
-            textColor="#757575"
-            disabled={actionInProgress}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onPress={() => executeCompletion(medicalRecord)}
-            mode="contained"
-            buttonColor="#4CAF50"
-            style={{borderRadius: 8}}
-            disabled={actionInProgress}
-            loading={actionInProgress}
-          >
-            Complete
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
+            
+            <TextInput
+              label="Completion Notes (optional)"
+              value={completeNotes}
+              onChangeText={setCompleteNotes}
+              mode="outlined"
+              style={styles.input}
+              multiline
+              numberOfLines={3}
+              outlineColor="#E0E0E0"
+              activeOutlineColor="#4CAF50"
+              disabled={actionInProgress}
+              placeholder="Enter any notes about the appointment outcome"
+            />
+          </Dialog.Content>
+          
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button 
+              onPress={() => setCompleteDialogVisible(false)} 
+              textColor="#757575"
+              disabled={actionInProgress}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onPress={handleCompleteAppointment}
+              mode="contained"
+              buttonColor="#4CAF50"
+              style={{borderRadius: 8}}
+              disabled={actionInProgress}
+              loading={actionInProgress}
+            >
+              Complete Appointment
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      
+      {/* Status Change Animation */}
+      {statusChanged && (
+        <View style={styles.animationContainer}>
+          <LottieView
+            ref={animationRef}
+            source={require('@/assets/animations/success.json')}
+            autoPlay
+            loop={false}
+            style={styles.animation}
+          />
+          <Text style={styles.animationText}>
+            Status updated successfully!
+          </Text>
+        </View>
+      )}
     </ThemedView>
   );
 }
@@ -765,6 +670,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   appBar: {
     backgroundColor: '#4CAF50',
@@ -897,16 +813,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actionButtons: {
+    padding: 16,
     flexDirection: 'row',
     justifyContent: 'center',
-    padding: 16,
-    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
-    marginHorizontal: 4,
+    borderColor: '#4CAF50',
     borderRadius: 8,
-    minWidth: 120,
   },
   medicalInfoContainer: {
     padding: 16,
@@ -988,35 +902,21 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
   },
-  quickCompleteButton: {
-    flex: 1,
-    marginRight: 8,
-    borderColor: '#4CAF50',
-    borderRadius: 8,
-  },
-  loadingContainer: {
-    flex: 1,
+  animationContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 100,
   },
-  notFoundContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+  animation: {
+    width: 150,
+    height: 150,
   },
-  medicalSummary: {
-    marginTop: 8,
-    backgroundColor: '#F5F5F5',
-    padding: 12,
-    borderRadius: 8,
-  },
-  medicalSummaryItem: {
-    marginBottom: 4,
-    fontSize: 14,
-  },
-  medicalSummaryLabel: {
+  animationText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#555',
+    marginTop: 16,
+    color: '#4CAF50',
   },
 }); 

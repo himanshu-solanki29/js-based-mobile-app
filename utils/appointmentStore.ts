@@ -1,7 +1,7 @@
-import { getPatientById } from '@/utils/patientStore';
-import { AppointmentStatus } from './types';
 import { useState, useEffect } from 'react';
 import appointmentStorageService from './appointmentStorageService';
+import { AppointmentStatus } from './types';
+import patientStorageService from './patientStorageService';
 
 // Re-export the AppointmentStatus type
 export { AppointmentStatus };
@@ -96,8 +96,8 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
 ];
 
 // Helper function to get the patient name from the patient store
-export const getPatientName = (patientId: string): string => {
-  const patient = getPatientById(patientId);
+export const getPatientName = async (patientId: string): Promise<string> => {
+  const patient = await patientStorageService.getPatientById(patientId);
   return patient ? patient.name : 'Unknown Patient';
 };
 
@@ -133,31 +133,65 @@ export const updateAppointmentStatus = async (
 };
 
 // Get appointments for a specific patient
-export const getPatientAppointments = (patientId: string): Appointment[] => {
-  return appointmentStorageService.getPatientAppointments(patientId);
+export const getPatientAppointments = async (patientId: string): Promise<Appointment[]> => {
+  return await appointmentStorageService.getPatientAppointments(patientId);
 };
 
 // Hook to subscribe to appointment data changes
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    const handleChange = () => {
-      setAppointments(appointmentStorageService.getAppointments());
+    const loadAppointments = async () => {
+      try {
+        setLoading(true);
+        const data = await appointmentStorageService.getAppointments();
+        setAppointments(data);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     
     // Initial load
-    handleChange();
+    loadAppointments();
     
     // Subscribe to changes
-    const unsubscribe = appointmentStorageService.subscribe(handleChange);
+    const unsubscribe = appointmentStorageService.subscribe(() => {
+      loadAppointments();
+    });
     
     return () => unsubscribe();
   }, []);
   
+  // Memoized sorted appointments
+  const sortedAppointments = sortAppointmentsByDate(appointments);
+  const sortedAppointmentsDesc = sortAppointmentsByDateDesc(appointments);
+  
+  // Filter by status helper
+  const getAppointmentsByStatus = (status: AppointmentStatus | 'all'): Appointment[] => {
+    if (status === 'all') return appointments;
+    return appointments.filter(a => a.status === status);
+  };
+  
+  // Filter for upcoming and past appointments
+  const upcomingAppointments = sortAppointmentsByDate(
+    appointments.filter(a => a.status === 'confirmed' || a.status === 'pending')
+  );
+  
+  const pastAppointments = sortAppointmentsByDateDesc(
+    appointments.filter(a => a.status === 'completed' || a.status === 'cancelled')
+  );
+  
   return {
     appointments,
-    sortedAppointments: sortAppointmentsByDate(appointments),
-    sortedAppointmentsDesc: sortAppointmentsByDateDesc(appointments)
+    loading,
+    sortedAppointments,
+    sortedAppointmentsDesc,
+    upcomingAppointments,
+    pastAppointments,
+    getAppointmentsByStatus
   };
 }; 
