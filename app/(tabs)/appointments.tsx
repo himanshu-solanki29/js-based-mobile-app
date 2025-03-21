@@ -448,6 +448,70 @@ export default function AppointmentsScreen() {
     );
   };
 
+  // Update the renderStatusFilter function to use a custom component instead of Chip
+  const renderStatusFilter = () => {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statusFilter}
+      >
+        {statusOptions.map((option) => {
+          const isSelected = selectedStatus === option;
+          const chipColors = option !== 'all' 
+            ? STATUS_COLORS[option as AppointmentStatus] 
+            : { bg: '#f0f0f0', text: '#757575', accent: '#757575' };
+          
+          // Use a consistent color for non-selected state
+          const nonSelectedBg = 'transparent';
+          const nonSelectedBorder = '#9E9E9E';
+          const nonSelectedText = '#616161';
+          
+          return (
+            <TouchableOpacity
+              key={option}
+              onPress={() => {
+                console.log(`Setting status to: ${option}`);
+                setSelectedStatus(option);
+              }}
+              style={{ 
+                borderRadius: 20,
+                marginHorizontal: 4,
+                overflow: 'hidden'
+              }}
+            >
+              <View
+                style={[
+                  styles.statusChip,
+                  { 
+                    backgroundColor: isSelected ? chipColors.bg : nonSelectedBg,
+                    borderColor: isSelected ? 'transparent' : nonSelectedBorder,
+                    borderWidth: 1,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }
+                ]}
+              >
+                <Text
+                  style={{
+                    color: isSelected ? chipColors.text : nonSelectedText,
+                    fontWeight: isSelected ? 'bold' : 'normal',
+                    fontSize: 13
+                  }}
+                >
+                  {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    );
+  };
+
   // Update the renderAppointmentItem to remove the 3-dots menu and use consistent colors
   const renderAppointmentItem = ({ item }: { item: Appointment }) => {
     // Ensure we're always using the latest patient name from the store
@@ -514,15 +578,7 @@ export default function AppointmentsScreen() {
                     rippleColor="rgba(0, 0, 0, 0.1)"
                     style={{ borderRadius: 12 }}
                   >
-                    <View style={[
-                      styles.statusBadge,
-                      { backgroundColor: statusColors.bg }
-                    ]}>
-                      <ThemedText style={[
-                        styles.statusText,
-                        { color: statusColors.text }
-                      ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
-                    </View>
+                    {renderStatusBadge(item.status)}
                   </TouchableRipple>
                 </View>
                 <ThemedText style={styles.appointmentTime}>
@@ -572,61 +628,6 @@ export default function AppointmentsScreen() {
     showToast(
       `Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
       'success'
-    );
-  };
-
-  // Update the renderStatusFilter function to use the STATUS_COLORS
-  const renderStatusFilter = () => {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.statusFilter}
-      >
-        {statusOptions.map((option) => {
-          const isSelected = selectedStatus === option;
-          const chipColors = option !== 'all' 
-            ? STATUS_COLORS[option as AppointmentStatus] 
-            : { bg: '#f0f0f0', text: '#757575', accent: '#757575' };
-          
-          // Use a consistent color for non-selected state
-          const nonSelectedBg = 'transparent';
-          const nonSelectedBorder = '#9E9E9E';
-          const nonSelectedText = '#616161';
-          
-          return (
-            <TouchableRipple
-              key={option}
-              onPress={() => setSelectedStatus(option)}
-              rippleColor="rgba(0, 0, 0, 0.08)"
-              style={{ 
-                borderRadius: 20,
-                marginHorizontal: 4,
-                overflow: 'hidden'
-              }}
-            >
-              <Chip
-                selected={isSelected}
-                style={[
-                  styles.statusChip,
-                  { 
-                    backgroundColor: isSelected ? chipColors.bg : nonSelectedBg,
-                    borderColor: isSelected ? 'transparent' : nonSelectedBorder,
-                    borderWidth: 1
-                  }
-                ]}
-                textStyle={{
-                  color: isSelected ? chipColors.text : nonSelectedText,
-                  fontWeight: isSelected ? 'bold' : 'normal'
-                }}
-                onPress={undefined} // Disable Chip's onPress as we're using TouchableRipple
-              >
-                {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
-              </Chip>
-            </TouchableRipple>
-          );
-        })}
-      </ScrollView>
     );
   };
 

@@ -8,7 +8,7 @@ import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { usePatients, getPatientsArray, Patient } from "@/utils/patientStore";
-import { FAB, Button, Divider, Surface, Searchbar, Avatar, TouchableRipple } from 'react-native-paper';
+import { FAB, Button, Divider, Surface, Searchbar, Avatar, TouchableRipple, Text } from 'react-native-paper';
 import { 
   addAppointment,
   sortAppointmentsByDateDesc 
@@ -227,37 +227,39 @@ export default function ExploreScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: 'Patients', headerShown: true }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      
       <View style={styles.header}>
-        <ThemedText style={styles.title}>Patient Directory</ThemedText>
+        <Text style={[styles.title, {fontSize: 28, fontWeight: '700', color: '#2e7d32'}]}>Patients</Text>
       </View>
 
       <Searchbar
         placeholder="Search by name or phone..."
-        value={searchQuery}
         onChangeText={setSearchQuery}
-        style={styles.searchbar}
-        iconColor="#4CAF50"
-        inputStyle={{ color: '#333333' }}
-        theme={{ colors: { primary: '#4CAF50' } }}
+        value={searchQuery}
+        style={[
+          styles.searchBar, 
+          { 
+            backgroundColor: '#f1f8e9',
+            borderWidth: 1,
+            borderColor: '#2e7d32',
+            borderRadius: 12,
+            elevation: 0
+          }
+        ]}
+        theme={{ colors: { primary: '#2e7d32' } }}
+        iconColor="#2e7d32"
       />
 
+      <TouchableOpacity style={styles.addButton} onPress={() => router.push("/register")}>
+        <FontAwesome5 name="user-plus" size={16} color={Colors.light.buttonText} style={styles.buttonIcon} />
+        <ThemedText style={styles.buttonText}>Add New Patient</ThemedText>
+      </TouchableOpacity>
+
       {filteredPatients.length === 0 ? (
-        <View style={styles.emptyContent}>
+        <View style={styles.noResultsContainer}>
           <FontAwesome5 name="users" size={48} color="#CCCCCC" />
-          <ThemedText style={styles.emptyText}>No patients found</ThemedText>
-          <ThemedText style={styles.emptySubText}>
-            {searchQuery ? 'Try a different search term' : 'Add a patient to get started'}
-          </ThemedText>
-          <Button 
-            mode="outlined" 
-            icon={() => <FontAwesome5 name="user-plus" size={16} color="#4CAF50" />}
-            style={styles.addPatientButton}
-            textColor="#4CAF50"
-            onPress={() => setPatientFormVisible(true)}
-          >
-            Add New Patient
-          </Button>
+          <Text style={styles.noResultsText}>No patients found</Text>
         </View>
       ) : (
         <FlatList
@@ -297,31 +299,33 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    paddingTop: 16,
+    backgroundColor: '#f8f9fa',
   },
   header: {
-    padding: 16,
-    paddingTop: 24,
-    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2e7d32',
   },
-  searchbar: {
+  searchBar: {
     marginHorizontal: 16,
     marginBottom: 16,
-    backgroundColor: 'white',
-    elevation: 2,
+    elevation: 0,
     borderRadius: 12,
-    height: 50,
   },
   list: {
-    flex: 1,
+    width: "100%"
   },
   listContent: {
-    padding: 16,
-    paddingTop: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   patientCard: {
     borderRadius: 16,
@@ -387,28 +391,33 @@ const styles = StyleSheet.create({
   buttonLabel: {
     fontSize: 12,
   },
-  emptyContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  emptyText: {
-    marginTop: 16,
-    color: '#9E9E9E',
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  emptySubText: {
-    color: '#9E9E9E',
-    textAlign: 'center',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  addPatientButton: {
-    marginTop: 20,
-    borderColor: '#4CAF50',
+  addButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
     borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    marginHorizontal: 16,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  noResultsText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#2e7d32',
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontWeight: "600"
   },
   fab: {
     position: 'absolute',
