@@ -3,8 +3,9 @@ import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton } from 'react-native-paper';
+import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme } from 'react-native-paper';
 import { useState, useEffect } from "react";
+import React from 'react';
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -230,13 +231,16 @@ export default function PatientDetailsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Patient Profile Card */}
         <Surface style={styles.profileCard} elevation={2}>
-          <View style={styles.profileHeader}>
-            <Avatar.Text 
-              size={60} 
-              label={patient.name.split(' ').map(n => n[0]).join('')}
-              color="#ffffff"
-              style={[styles.avatar, { backgroundColor: "#4CAF50" }]}
-            />
+          <View style={styles.profileContent}>
+            <View style={styles.avatarSection}>
+              <Avatar.Icon
+                size={64}
+                icon="account"
+                style={{ backgroundColor: '#FFFFFF' }}
+                color="#4CAF50"
+              />
+            </View>
+            
             <View style={styles.profileInfo}>
               <Text style={styles.patientName}>{patient.name}</Text>
               <View style={styles.patientMeta}>
@@ -275,63 +279,103 @@ export default function PatientDetailsScreen() {
         {/* Vital Stats */}
         <View style={styles.vitalStatsContainer}>
           <Surface style={styles.vitalStat} elevation={1}>
-            <Text style={styles.vitalValue}>{patient.height}</Text>
-            <Text style={styles.vitalLabel}>
-              <FontAwesome5 name="ruler-vertical" size={12} color="#757575" /> Height
-            </Text>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.height}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="ruler-vertical" size={12} color="#757575" /> Height
+                </Text>
+              </View>
+            </TouchableRipple>
           </Surface>
           
           <Surface style={styles.vitalStat} elevation={1}>
-            <Text style={styles.vitalValue}>{patient.weight}</Text>
-            <Text style={styles.vitalLabel}>
-              <FontAwesome5 name="weight" size={12} color="#757575" /> Weight
-            </Text>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.weight}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="weight" size={12} color="#757575" /> Weight
+                </Text>
+              </View>
+            </TouchableRipple>
           </Surface>
           
           <Surface style={styles.vitalStat} elevation={1}>
-            <Text style={styles.vitalValue}>{patient.bloodPressure}</Text>
-            <Text style={styles.vitalLabel}>
-              <FontAwesome5 name="heartbeat" size={12} color="#757575" /> BP
-            </Text>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.bloodPressure}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="heartbeat" size={12} color="#757575" /> BP
+                </Text>
+              </View>
+            </TouchableRipple>
           </Surface>
         </View>
         
         {/* Patient Details */}
         <Surface style={styles.detailsCard} elevation={1}>
-          <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>Contact Information</ThemedText>
-          </View>
-          <Divider style={styles.divider} />
-          
-          <View style={styles.detailItem}>
-            <FontAwesome5 name="phone" size={14} color="#757575" style={styles.detailIcon} />
+          <TouchableRipple
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{borderRadius: 12}}
+            onPress={() => {}}
+          >
             <View>
-              <Text style={styles.detailLabel}>Phone</Text>
-              <Text style={styles.detailValue}>{patient.phone}</Text>
+              <View style={styles.sectionHeader}>
+                <ThemedText style={styles.sectionTitle}>Contact Information</ThemedText>
+              </View>
+              <Divider style={styles.divider} />
+              
+              <View style={styles.detailItem}>
+                <FontAwesome5 name="phone" size={14} color="#757575" style={styles.detailIcon} />
+                <View>
+                  <Text style={styles.detailLabel}>Phone</Text>
+                  <Text style={styles.detailValue}>{patient.phone}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.detailItem}>
+                <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.detailIcon} />
+                <View>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue}>{patient.email}</Text>
+                </View>
+              </View>
             </View>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.detailIcon} />
-            <View>
-              <Text style={styles.detailLabel}>Email</Text>
-              <Text style={styles.detailValue}>{patient.email}</Text>
-            </View>
-          </View>
+          </TouchableRipple>
         </Surface>
         
         {/* Medical History */}
         <Surface style={styles.detailsCard} elevation={1}>
+          <TouchableRipple
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{borderRadius: 12}}
+            onPress={() => {}}
+          >
+            <View>
           <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>Medical History</ThemedText>
-          </View>
-          <Divider style={styles.divider} />
-          
-          <View style={styles.medicalHistoryBox}>
-            <ThemedText style={styles.medicalHistoryText}>
-              {patient.medicalHistory || "No medical history recorded"}
+                <ThemedText style={styles.sectionTitle}>Medical History</ThemedText>
+              </View>
+              <Divider style={styles.divider} />
+              
+              <View style={styles.medicalHistoryBox}>
+                <ThemedText style={styles.medicalHistoryText}>
+                  {patient.medicalHistory || "No medical history recorded"}
             </ThemedText>
-          </View>
+              </View>
+            </View>
+          </TouchableRipple>
         </Surface>
         
         {/* Appointments Section */}
@@ -343,8 +387,8 @@ export default function PatientDetailsScreen() {
               onPress={() => setSchedulerVisible(true)}
               style={styles.scheduleButton}
               labelStyle={styles.scheduleButtonLabel}
-              icon={() => <FontAwesome5 name="plus" size={12} color="#FFFFFF" />}
-              compact
+              icon="plus-circle"
+              buttonColor="#4CAF50"
             >
               Schedule
             </Button>
@@ -361,59 +405,65 @@ export default function PatientDetailsScreen() {
               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
               .slice(0, 3)
               .map((appointment, index) => (
-                <Surface 
-                  key={appointment.id} 
+                <Surface
+                  key={appointment.id}
                   style={[
-                    styles.appointmentCard, 
-                    { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#4CAF50' }
-                  ]} 
-                  elevation={2}
+                    styles.appointmentCard,
+                    { backgroundColor: '#FFFFFF' }
+                  ]}
+                  elevation={1}
                 >
-                  <View style={styles.appointmentCardContent}>
-                    <View style={[
-                      styles.dateIndicator,
-                      { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
-                    ]}>
-                      <Text style={[
-                        styles.dateDay,
-                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                      ]}>
-                        {new Date(appointment.date).getDate()}
-                      </Text>
-                      <Text style={[
-                        styles.dateMonth,
-                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                      ]}>
-                        {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.appointmentInfo}>
-                      <View style={styles.appointmentMainInfo}>
-                        <Text style={styles.appointmentReason}>{appointment.reason}</Text>
-                        <Text style={styles.appointmentTime}>
-                          <FontAwesome5 
-                            name="clock" 
-                            size={12} 
-                            color="#757575" 
-                            style={{marginRight: 4}}
-                          /> {appointment.time}
-                        </Text>
-                      </View>
-                      
+                  <TouchableRipple
+                    rippleColor="rgba(0, 0, 0, 0.1)"
+                    style={{borderRadius: 12}}
+                    onPress={() => router.push(`/appointment/${appointment.id}`)}
+                  >
+                    <View style={styles.appointmentCardContent}>
                       <View style={[
-                        styles.statusChip,
+                        styles.dateCircle, 
                         { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
                       ]}>
                         <Text style={[
-                          styles.statusChipText,
+                          styles.dateDay,
                           { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
                         ]}>
-                          {appointment.status}
+                          {new Date(appointment.date).getDate()}
+                        </Text>
+                        <Text style={[
+                          styles.dateMonth,
+                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                        ]}>
+                          {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
                         </Text>
                       </View>
+                      
+                      <View style={styles.appointmentInfo}>
+                        <View style={styles.appointmentMainInfo}>
+                          <Text style={styles.appointmentReason}>{appointment.reason}</Text>
+                          <Text style={styles.appointmentTime}>
+                            <FontAwesome5 
+                              name="clock" 
+                              size={12} 
+                              color="#757575" 
+                              style={{marginRight: 4}}
+                            /> {appointment.time}
+                          </Text>
+                        </View>
+                        
+                        <View style={[
+                          styles.statusChip,
+                          { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                        ]}>
+                          <Text style={[
+                            styles.statusChipText,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {appointment.status}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
+                  </TouchableRipple>
                 </Surface>
               ))
             }
@@ -427,7 +477,8 @@ export default function PatientDetailsScreen() {
                 <Button 
                   mode="outlined" 
                   onPress={() => setSchedulerVisible(true)}
-                  style={styles.emptyStateButton}
+                  style={styles.scheduleEmptyButton}
+                  textColor="#4CAF50"
                 >
                   Schedule Now
                 </Button>
@@ -628,12 +679,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
-  profileHeader: {
+  profileContent: {
     flexDirection: 'row',
     padding: 16,
     alignItems: 'center',
   },
-  avatar: {
+  avatarSection: {
     marginRight: 16,
   },
   profileInfo: {
@@ -757,13 +808,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   scheduleButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 16,
-    height: 32,
+    borderRadius: 24,
+    elevation: 2,
+    paddingHorizontal: 8,
   },
   scheduleButtonLabel: {
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'none',
   },
   appointmentsList: {
     padding: 16,
@@ -779,17 +832,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 8,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
   },
   appointmentCardContent: {
     flexDirection: 'row',
     padding: 12,
   },
-  dateIndicator: {
+  dateCircle: {
     width: 50,
     height: 50,
-    borderRadius: 8,
-    alignItems: 'center',
+    borderRadius: 25,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   dateDay: {
     fontSize: 18,
@@ -853,7 +908,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9E9E9E',
   },
-  emptyStateButton: {
+  scheduleEmptyButton: {
     borderColor: '#4CAF50',
     borderRadius: 20,
   },
@@ -906,5 +961,19 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     textAlign: 'center',
     marginTop: 4,
+  },
+  vitalStatContent: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  dateIndicator: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
 });

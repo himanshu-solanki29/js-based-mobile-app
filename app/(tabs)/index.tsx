@@ -11,7 +11,7 @@ import {
   useAppointments,
   sortAppointmentsByDateDesc
 } from "../../utils/appointmentStore";
-import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput } from 'react-native-paper';
+import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput, TouchableRipple } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
 
@@ -232,179 +232,233 @@ export default function HomeScreen() {
     const formattedDate = formatDate(item.date);
     
     return (
-      <Pressable 
+      <TouchableRipple
         style={styles.appointmentItem}
         onPress={() => router.push(`/appointment/${item.id}`)}
+        rippleColor="rgba(0, 0, 0, 0.1)"
       >
-        <View style={styles.appointmentHeader}>
-          <ThemedText style={styles.appointmentPatient}>{item.patientName}</ThemedText>
-          <View 
-            style={[
-              styles.statusBadge, 
-              { backgroundColor: statusBgColors[item.status] }
-            ]}
-          >
-            <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
-              {item.status}
-            </ThemedText>
+        <View>
+          <View style={styles.appointmentHeader}>
+            <ThemedText style={styles.appointmentPatient}>{item.patientName}</ThemedText>
+            <View 
+              style={[
+                styles.statusBadge, 
+                { backgroundColor: statusBgColors[item.status] }
+              ]}
+            >
+              <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
+                {item.status}
+              </ThemedText>
+            </View>
           </View>
+          <ThemedText style={styles.appointmentTime}>
+            <FontAwesome5 name="calendar-alt" size={12} /> {formattedDate}, {item.time}
+          </ThemedText>
+          <ThemedText style={styles.appointmentReason} numberOfLines={1} ellipsizeMode="tail">
+            {item.reason}
+          </ThemedText>
         </View>
-        <ThemedText style={styles.appointmentTime}>
-          <FontAwesome5 name="calendar-alt" size={12} /> {formattedDate}, {item.time}
-        </ThemedText>
-        <ThemedText style={styles.appointmentReason} numberOfLines={1} ellipsizeMode="tail">
-          {item.reason}
-        </ThemedText>
-      </Pressable>
+      </TouchableRipple>
     );
   };
   
   return (
-    <ThemedView style={styles.container}>
+      <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
             <ThemedText style={styles.welcomeText}>Welcome back</ThemedText>
             <ThemedText style={styles.title}>Dashboard</ThemedText>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/settings')}>
+          <TouchableRipple 
+            style={styles.profileButton} 
+            onPress={() => router.push('/settings')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
+          >
             <FontAwesome5 name="user-circle" size={32} color="#4CAF50" />
-          </TouchableOpacity>
+          </TouchableRipple>
         </View>
         
         <Surface style={styles.statsSurface} elevation={1}>
-          <View style={styles.statsRow}>
-            <StatCard 
-              value={patientsArray.length.toString()} 
-              label="Patients"
-              icon="users"
-              color="#4CAF50"
-            />
-            <StatCard 
-              value={todayAppointments.toString()} 
-              label="Today"
-              icon="calendar-day"
-              color="#FF9800"
-            />
-          </View>
-          <View style={styles.statsRow}>
-            <StatCard 
-              value={weekAppointments.toString()} 
-              label="This Week"
-              icon="calendar-week"
-              color="#2196F3"
-            />
-            <StatCard 
-              value={pendingAppointments.toString()} 
-              label="Pending"
-              icon="clock"
-              color="#F44336"
-            />
-          </View>
+          <TouchableRipple
+            onPress={() => router.push('/(tabs)/appointments')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{ borderRadius: 12 }}
+          >
+            <View>
+              <View style={styles.statsRow}>
+                <StatCard 
+                  value={patientsArray.length.toString()} 
+                  label="Patients"
+                  icon="users"
+                  color="#4CAF50"
+                />
+                <StatCard 
+                  value={todayAppointments.toString()} 
+                  label="Today"
+                  icon="calendar-day"
+                  color="#FF9800"
+                />
+              </View>
+              <View style={styles.statsRow}>
+                <StatCard 
+                  value={weekAppointments.toString()} 
+                  label="This Week"
+                  icon="calendar-week"
+                  color="#2196F3"
+                />
+                <StatCard 
+                  value={pendingAppointments.toString()} 
+                  label="Pending"
+                  icon="clock"
+                  color="#F44336"
+                />
+              </View>
+            </View>
+          </TouchableRipple>
         </Surface>
-        
+
         {/* Upcoming Appointments Widget */}
         <Surface style={styles.widgetSurface} elevation={1}>
-          <View style={styles.widgetHeader}>
-            <ThemedText style={styles.widgetTitle}>Upcoming Appointments</ThemedText>
-            <Button 
-              mode="text" 
-              onPress={() => router.push('/(tabs)/appointments')}
-              labelStyle={styles.seeAllText}
-              compact
-            >
-              See All
-            </Button>
+          <TouchableRipple
+            onPress={() => router.push('/(tabs)/appointments')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{ borderRadius: 12 }}
+          >
+            <View>
+              <View style={styles.widgetHeader}>
+                <ThemedText style={styles.widgetTitle}>Upcoming Appointments</ThemedText>
+                <Button 
+                  mode="text" 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push('/(tabs)/appointments');
+                  }}
+                  labelStyle={styles.seeAllText}
+                  compact
+                >
+                  See All
+                </Button>
           </View>
           
-          {upcomingAppointments.length === 0 ? (
-            <View style={styles.emptyContent}>
-              <FontAwesome5 name="calendar-check" size={32} color="#CCCCCC" />
-              <ThemedText style={styles.emptyText}>No upcoming appointments</ThemedText>
-              <Button 
-                mode="outlined" 
-                onPress={() => router.push('/(tabs)/appointments')}
-                style={styles.scheduleEmptyButton}
-                textColor="#4CAF50"
-              >
-                Schedule Now
-              </Button>
+              {upcomingAppointments.length === 0 ? (
+                <View style={styles.emptyContent}>
+                  <FontAwesome5 name="calendar-check" size={32} color="#CCCCCC" />
+                  <ThemedText style={styles.emptyText}>No upcoming appointments</ThemedText>
+                  <Button 
+                    mode="outlined" 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/(tabs)/appointments');
+                    }}
+                    style={styles.scheduleEmptyButton}
+                    textColor="#4CAF50"
+                  >
+                    Schedule Now
+                  </Button>
+                </View>
+              ) : (
+                upcomingAppointments.map((item, index) => (
+                  <View key={item.id}>
+                    {index > 0 && <Divider style={styles.appointmentDivider} />}
+                    <AppointmentItem item={item} />
+                  </View>
+                ))
+              )}
             </View>
-          ) : (
-            upcomingAppointments.map((item, index) => (
-              <View key={item.id}>
-                {index > 0 && <Divider style={styles.appointmentDivider} />}
-                <AppointmentItem item={item} />
-              </View>
-            ))
-          )}
+          </TouchableRipple>
         </Surface>
         
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>Stats Overview</ThemedText>
         </View>
-        
+
         <Surface style={styles.widgetSurface} elevation={1}>
-          <Card.Content style={styles.statsContent}>
-            <View style={styles.statsRow}>
-              <View style={styles.statBlock}>
-                <ThemedText style={styles.statPercentage}>{Math.round((pendingAppointments/appointments.length)*100)}%</ThemedText>
-                <ThemedText style={styles.statLabel}>Pending</ThemedText>
-                <ProgressBar progress={pendingAppointments/appointments.length} color="#FF9800" style={styles.progressBar} />
-              </View>
-              <View style={styles.statBlock}>
-                <ThemedText style={styles.statPercentage}>{Math.round((completedAppointments/appointments.length)*100)}%</ThemedText>
-                <ThemedText style={styles.statLabel}>Completed</ThemedText>
-                <ProgressBar progress={completedAppointments/appointments.length} color="#4CAF50" style={styles.progressBar} />
-              </View>
+          <TouchableRipple
+            onPress={() => {}}
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{ borderRadius: 12 }}
+          >
+            <Card.Content style={styles.statsContent}>
+              <View style={styles.statsRow}>
+                <View style={styles.statBlock}>
+                  <ThemedText style={styles.statLabel}>Total Patients</ThemedText>
+                  <View style={styles.statValueRow}>
+                    <ThemedText style={styles.statValue}>{patientsArray.length}</ThemedText>
+                    <ThemedText style={styles.statChange}>{patientsArray.length > 0 ? `+${Math.min(5, patientsArray.length)}` : '0'}</ThemedText>
+                  </View>
+                  <ProgressBar progress={patientsArray.length / 100} color="#4CAF50" style={styles.progressBar} />
+                </View>
+                
+                <View style={styles.statBlock}>
+                  <ThemedText style={styles.statLabel}>Appointments</ThemedText>
+                  <View style={styles.statValueRow}>
+                    <ThemedText style={styles.statValue}>{appointments.length}</ThemedText>
+                    <ThemedText style={styles.statChange}>{appointments.length > 0 ? `+${Math.min(2, appointments.length)}` : '0'}</ThemedText>
+                  </View>
+                  <ProgressBar progress={appointments.length / 100} color="#2196F3" style={styles.progressBar} />
+                </View>
             </View>
-          </Card.Content>
+            </Card.Content>
+          </TouchableRipple>
         </Surface>
         
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText>
-        </View>
+          </View>
         
         <View style={styles.quickActions}>
-          <TouchableOpacity 
+          <TouchableRipple 
             style={styles.actionButton} 
             onPress={() => router.push('/register')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-              <FontAwesome5 name="user-plus" size={18} color="#4CAF50" />
+            <View>
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <FontAwesome5 name="user-plus" size={18} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.actionText}>Add Patient</ThemedText>
             </View>
-            <ThemedText style={styles.actionText}>Add Patient</ThemedText>
-          </TouchableOpacity>
+          </TouchableRipple>
           
-          <TouchableOpacity 
+          <TouchableRipple 
             style={styles.actionButton} 
             onPress={() => router.push('/(tabs)/appointments')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-              <FontAwesome5 name="calendar-plus" size={18} color="#4CAF50" />
+            <View>
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <FontAwesome5 name="calendar-plus" size={18} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.actionText}>Schedule</ThemedText>
             </View>
-            <ThemedText style={styles.actionText}>Schedule</ThemedText>
-          </TouchableOpacity>
+          </TouchableRipple>
           
-          <TouchableOpacity 
+          <TouchableRipple 
             style={styles.actionButton} 
             onPress={() => router.push('/(tabs)/explore')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-              <FontAwesome5 name="search" size={18} color="#4CAF50" />
+            <View>
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <FontAwesome5 name="search" size={18} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.actionText}>Search</ThemedText>
             </View>
-            <ThemedText style={styles.actionText}>Search</ThemedText>
-          </TouchableOpacity>
+          </TouchableRipple>
           
-          <TouchableOpacity 
+          <TouchableRipple 
             style={styles.actionButton} 
             onPress={() => router.push('/settings')}
+            rippleColor="rgba(0, 0, 0, 0.1)"
           >
-            <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-              <FontAwesome5 name="cog" size={18} color="#4CAF50" />
+            <View>
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <FontAwesome5 name="cog" size={18} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.actionText}>Settings</ThemedText>
             </View>
-            <ThemedText style={styles.actionText}>Settings</ThemedText>
-          </TouchableOpacity>
+          </TouchableRipple>
         </View>
       </ScrollView>
       
@@ -494,7 +548,7 @@ export default function HomeScreen() {
           </Button>
         </Dialog.Actions>
       </Dialog>
-    </ThemedView>
+      </ThemedView>
   );
 }
 
@@ -541,7 +595,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   profileButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   statsSurface: {
     borderRadius: 16,
@@ -619,8 +675,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   appointmentItem: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
+    borderRadius: 8,
   },
   appointmentHeader: {
     flexDirection: 'row',
@@ -704,6 +761,8 @@ const styles = StyleSheet.create({
     width: '23%',
     alignItems: 'center',
     marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   actionIcon: {
     width: 48,
@@ -763,5 +822,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 8,
     paddingTop: 4,
+  },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+  },
+  
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  
+  statChange: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '500',
   },
 });

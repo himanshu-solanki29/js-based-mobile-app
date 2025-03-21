@@ -1,6 +1,6 @@
 import { StyleSheet, FlatList, TouchableOpacity, View, Linking, Alert } from "react-native";
 import { Colors } from "@/constants/Colors";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useState, useEffect } from "react";
@@ -8,11 +8,13 @@ import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { usePatients, getPatientsArray, Patient } from "@/utils/patientStore";
-import { FAB, Button, Divider, Surface, Searchbar, Avatar } from 'react-native-paper';
+import { FAB, Button, Divider, Surface, Searchbar, Avatar, TouchableRipple } from 'react-native-paper';
 import { 
   addAppointment,
   sortAppointmentsByDateDesc 
 } from '@/utils/appointmentStore';
+import PatientFormDialog from "@/components/PatientFormDialog";
+import { useGlobalToast } from '@/components/GlobalToastProvider';
 
 // Mock appointment data for adding new appointments
 const MOCK_APPOINTMENTS = [
@@ -49,6 +51,9 @@ export default function ExploreScreen() {
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [isSchedulerVisible, setSchedulerVisible] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [isPatientFormVisible, setPatientFormVisible] = useState(false);
+  const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
+  const { showToast } = useGlobalToast();
 
   // Initialize filtered patients on component mount and when patients change
   useEffect(() => {
@@ -88,7 +93,7 @@ export default function ExploreScreen() {
     });
     
     // Show toast notification
-    alert(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`);
+    showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
     
     // Close scheduler
     setSchedulerVisible(false);
@@ -123,50 +128,63 @@ export default function ExploreScreen() {
       .catch(err => Alert.alert('Error', 'Failed to open messaging app'));
   };
 
+  const handlePatientFormSuccess = (patientId: string) => {
+    // Show success message
+    showToast('Patient added successfully!', 'success');
+    
+    // Close the dialog and refresh patients list
+    setPatientFormVisible(false);
+    // Re-fetch patients
+    setFilteredPatients(getPatientsArray());
+  };
+
   const renderPatientItem = ({ item }: { item: Patient }) => (
     <Surface style={styles.patientCard} elevation={1}>
-      <TouchableOpacity 
+      <TouchableRipple
         style={styles.patientCardContent}
         onPress={() => router.push(`/patient/${item.id}`)}
+        rippleColor="rgba(0, 0, 0, 0.1)"
       >
-        <View style={styles.patientHeader}>
-          <View style={styles.patientNameContainer}>
-            <Avatar.Icon 
-              size={40} 
-              icon="account" 
-              style={{ backgroundColor: '#E8F5E9' }}
-              color="#4CAF50"
-            />
-            <View style={styles.patientNameDetails}>
-              <ThemedText style={styles.patientName}>{item.name}</ThemedText>
-              <ThemedText style={styles.patientDemographics}>
-                {item.age} years • {item.gender}
+        <View>
+          <View style={styles.patientHeader}>
+            <View style={styles.patientNameContainer}>
+              <Avatar.Icon 
+                size={40} 
+                icon="account" 
+                style={{ backgroundColor: '#E8F5E9' }}
+                color="#4CAF50"
+              />
+              <View style={styles.patientNameDetails}>
+                <ThemedText style={styles.patientName}>{item.name}</ThemedText>
+                <ThemedText style={styles.patientDemographics}>
+                  {item.age} years • {item.gender}
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+          
+          <Divider style={styles.divider} />
+        
+          <View style={styles.patientDetails}>
+            <View style={styles.detailRow}>
+              <FontAwesome5 name="phone" size={14} color="#4CAF50" style={styles.detailIcon} />
+              <ThemedText style={styles.detailText}>{item.phone}</ThemedText>
+            </View>
+            
+            <View style={styles.detailRow}>
+              <FontAwesome5 name="envelope" size={14} color="#4CAF50" style={styles.detailIcon} />
+              <ThemedText style={styles.detailText}>{item.email}</ThemedText>
+            </View>
+            
+            <View style={styles.detailRow}>
+              <FontAwesome5 name="calendar-check" size={14} color="#4CAF50" style={styles.detailIcon} />
+              <ThemedText style={styles.detailText}>
+                Last Visit: {item.lastVisit ? formatDate(item.lastVisit) : 'No visits yet'}
               </ThemedText>
             </View>
           </View>
         </View>
-        
-        <Divider style={styles.divider} />
-        
-        <View style={styles.patientDetails}>
-          <View style={styles.detailRow}>
-            <FontAwesome5 name="phone" size={14} color="#4CAF50" style={styles.detailIcon} />
-            <ThemedText style={styles.detailText}>{item.phone}</ThemedText>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <FontAwesome5 name="envelope" size={14} color="#4CAF50" style={styles.detailIcon} />
-            <ThemedText style={styles.detailText}>{item.email}</ThemedText>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <FontAwesome5 name="calendar-check" size={14} color="#4CAF50" style={styles.detailIcon} />
-            <ThemedText style={styles.detailText}>
-              Last Visit: {item.lastVisit ? formatDate(item.lastVisit) : 'No visits yet'}
-            </ThemedText>
-          </View>
-        </View>
-      </TouchableOpacity>
+      </TouchableRipple>
       
       <Divider style={styles.divider} />
       
@@ -209,6 +227,7 @@ export default function ExploreScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <Stack.Screen options={{ title: 'Patients', headerShown: true }} />
       <View style={styles.header}>
         <ThemedText style={styles.title}>Patient Directory</ThemedText>
       </View>
@@ -235,7 +254,7 @@ export default function ExploreScreen() {
             icon={() => <FontAwesome5 name="user-plus" size={16} color="#4CAF50" />}
             style={styles.addPatientButton}
             textColor="#4CAF50"
-            onPress={() => router.push("/register")}
+            onPress={() => setPatientFormVisible(true)}
           >
             Add New Patient
           </Button>
@@ -262,7 +281,14 @@ export default function ExploreScreen() {
         icon="plus"
         style={styles.fab}
         color="#ffffff"
-        onPress={() => router.push("/register")}
+        onPress={() => setPatientFormVisible(true)}
+      />
+      
+      {/* Patient Form Dialog */}
+      <PatientFormDialog 
+        visible={isPatientFormVisible} 
+        onDismiss={() => setPatientFormVisible(false)} 
+        onSuccess={handlePatientFormSuccess} 
       />
     </ThemedView>
   );
