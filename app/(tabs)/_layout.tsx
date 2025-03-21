@@ -40,8 +40,8 @@ export default function TabLayout() {
           ...(Platform.OS === 'ios' ? { position: "absolute" } : {}),
           ...cleanTabStyle,
         },
-        // Add tab animation - supported values are 'fade', 'shift', or 'none'
-        animation: 'fade',
+        // Disable tab animations
+        animation: 'none',
       }}>
       <Tabs.Screen
         name="index"
