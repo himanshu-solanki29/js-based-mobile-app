@@ -36,10 +36,8 @@ import {
   Appointment, 
   AppointmentStatus, 
   getPatientName,
-  addAppointment,
-  updateAppointmentStatus,
-  useAppointments
 } from '@/utils/appointmentStore';
+import useAppointmentStorage from '@/utils/useAppointmentStorage';
 import { getPatientById } from '@/utils/patientStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 
@@ -51,28 +49,37 @@ const STATUS_COLORS = {
     accent: '#4CAF50'
   },
   pending: {
-    bg: '#FFF3E0',
-    text: '#E65100',
-    accent: '#FF9800'
-  },
-  completed: {
-    bg: '#E3F2FD',
-    text: '#1565C0',
-    accent: '#2196F3'
+    bg: '#FFF8E1',
+    text: '#F57F17',
+    accent: '#FFC107'
   },
   cancelled: {
     bg: '#FFEBEE',
     text: '#C62828',
     accent: '#F44336'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#1565C0',
+    accent: '#2196F3'
   }
 };
 
 export default function AppointmentsScreen() {
+  const {
+    appointments,
+    loading,
+    error,
+    addAppointment,
+    updateAppointmentStatus,
+    getSortedAppointments,
+    getAppointmentsByStatus
+  } = useAppointmentStorage();
+  
   const router = useRouter();
   const params = useLocalSearchParams();
   const theme = useTheme();
   const { showToast } = useGlobalToast();
-  const { appointments, upcomingAppointments, pastAppointments } = useAppointments();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{start: string | null, end: string | null}>({start: null, end: null});

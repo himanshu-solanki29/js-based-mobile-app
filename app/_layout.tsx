@@ -5,12 +5,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
+import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native";
 import { GlobalToastProvider } from "@/components/GlobalToastProvider";
+import { initializeStorage } from '@/utils/initializeStorage';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -66,6 +66,20 @@ export default function RootLayout() {
   // Select theme based on color scheme
   const paperTheme = colorScheme === 'dark' ? paperDarkTheme : paperLightTheme;
   const navigationTheme = colorScheme === 'dark' ? navigationDarkTheme : navigationLightTheme;
+
+  // Initialize storage when the app loads
+  useEffect(() => {
+    const setupStorage = async () => {
+      try {
+        await initializeStorage();
+        console.log('Storage initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize storage:', error);
+      }
+    };
+
+    setupStorage();
+  }, []);
 
   useEffect(() => {
     if (loaded) {

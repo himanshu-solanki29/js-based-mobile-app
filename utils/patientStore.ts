@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import patientStorageService from './patientStorageService';
 
 // Define MedicalRecord interface locally to avoid import issues
 interface MedicalRecord {
@@ -35,7 +36,7 @@ export type PatientsData = {
   [key: string]: Patient;
 };
 
-// Initial mock data
+// Initial mock data - kept for reference and initialization
 export const INITIAL_PATIENTS: PatientsData = {
   "1": {
     id: "1",
@@ -135,61 +136,28 @@ export const INITIAL_PATIENTS: PatientsData = {
   }
 };
 
-// In-memory patient store (would be a database in a real app)
-let patients = { ...INITIAL_PATIENTS };
-let listenerCallbacks: (() => void)[] = [];
-
 // Helper to convert to array format
 export const getPatientsArray = (): Patient[] => {
-  return Object.values(patients);
+  return patientStorageService.getPatients();
 };
 
 // Add new patient
-export const addPatient = (patientData: PatientFormData): Patient => {
-  const id = (Object.keys(patients).length + 1).toString();
-  
-  const newPatient: Patient = {
-    ...patientData,
-    id,
-    visits: []
-  };
-  
-  patients = {
-    ...patients,
-    [id]: newPatient
-  };
-  
-  // Notify listeners
-  listenerCallbacks.forEach(callback => callback());
-  
-  return newPatient;
+export const addPatient = async (patientData: PatientFormData): Promise<Patient> => {
+  return await patientStorageService.addPatient(patientData);
 };
 
 // Get patient by ID
 export const getPatientById = (id: string): Patient | null => {
-  return patients[id] || null;
+  return patientStorageService.getPatientById(id);
 };
 
 // Update patient
-export const updatePatient = (id: string, data: Partial<Patient>): Patient | null => {
-  if (!patients[id]) return null;
-  
-  patients = {
-    ...patients,
-    [id]: {
-      ...patients[id],
-      ...data
-    }
-  };
-  
-  // Notify listeners
-  listenerCallbacks.forEach(callback => callback());
-  
-  return patients[id];
+export const updatePatient = async (id: string, data: Partial<Patient>): Promise<Patient | null> => {
+  return await patientStorageService.updatePatient(id, data);
 };
 
 // Function to add a new medical visit record from a completed appointment
-export const addMedicalRecord = (
+export const addMedicalRecord = async (
   patientId: string, 
   visitData: {
     date: string;
@@ -199,46 +167,32 @@ export const addMedicalRecord = (
     prescription?: string;
     complaint?: string;
   }
-): Patient | null => {
-  const patient = getPatientById(patientId);
-  if (!patient) return null;
-  
-  // Create a new visit record
-  const newVisit: Visit = {
-    date: visitData.date,
-    complaint: visitData.complaint || '',
-    diagnosis: visitData.diagnosis,
-    bloodPressure: visitData.bloodPressure || patient.bloodPressure || '',
-    weight: visitData.weight || patient.weight || '',
-    prescription: visitData.prescription || ''
-  };
-  
-  // Update patient with new visit
-  const updatedPatient = updatePatient(patientId, {
-    visits: [...patient.visits, newVisit],
-    lastVisit: visitData.date,
-    // Also update current vitals if provided
-    ...(visitData.bloodPressure ? { bloodPressure: visitData.bloodPressure } : {}),
-    ...(visitData.weight ? { weight: visitData.weight } : {})
-  });
-  
-  return updatedPatient;
+): Promise<Patient | null> => {
+  return await patientStorageService.addMedicalRecord(patientId, visitData);
 };
 
 // Hook to subscribe to patient data changes
 export const usePatients = () => {
-  const [patientData, setPatientData] = useState<PatientsData>(patients);
+  const [patientData, setPatientData] = useState<PatientsData>({});
   
   useEffect(() => {
     const handleChange = () => {
-      setPatientData({ ...patients });
+      const patientsArray = patientStorageService.getPatients();
+      const patientsObj = patientsArray.reduce((acc, patient) => {
+        acc[patient.id] = patient;
+        return acc;
+      }, {} as PatientsData);
+      
+      setPatientData(patientsObj);
     };
     
-    listenerCallbacks.push(handleChange);
+    // Initial load
+    handleChange();
     
-    return () => {
-      listenerCallbacks = listenerCallbacks.filter(cb => cb !== handleChange);
-    };
+    // Subscribe to changes
+    const unsubscribe = patientStorageService.subscribe(handleChange);
+    
+    return () => unsubscribe();
   }, []);
   
   return {

@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
-import { usePatients, getPatientsArray, Patient } from "@/utils/patientStore";
+import { Patient } from "@/utils/patientStore";
 import { FAB, Button, Divider, Surface, Searchbar, Avatar, TouchableRipple, Text } from 'react-native-paper';
 import { 
   addAppointment,
@@ -15,6 +15,7 @@ import {
 } from '@/utils/appointmentStore';
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
+import usePatientStorage from '@/utils/usePatientStorage';
 
 // Mock appointment data for adding new appointments
 const MOCK_APPOINTMENTS = [
@@ -46,7 +47,7 @@ type Appointment = {
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const { patientsArray } = usePatients();
+  const { patients, loading } = usePatientStorage();
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [isSchedulerVisible, setSchedulerVisible] = useState(false);
@@ -57,24 +58,24 @@ export default function ExploreScreen() {
 
   // Initialize filtered patients on component mount and when patients change
   useEffect(() => {
-    setFilteredPatients(patientsArray);
-  }, [patientsArray]);
+    setFilteredPatients(patients);
+  }, [patients]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(patientsArray);
+      setFilteredPatients(patients);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = patientsArray.filter(patient => 
+      const filtered = patients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, patientsArray]);
+  }, [searchQuery, patients]);
 
-  const handleScheduleAppointment = (appointmentData: {
+  const handleScheduleAppointment = async (appointmentData: {
     date: Date;
     time: string;
     reason: string;
@@ -82,21 +83,29 @@ export default function ExploreScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    // Use the appointmentStore to add the appointment
-    const newAppointment = addAppointment({
-      date: appointmentData.date,
-      time: appointmentData.time,
-      reason: appointmentData.reason,
-      notes: appointmentData.notes,
-      patientId: appointmentData.patientId,
-      status: 'pending'
-    });
+    console.log("Scheduling appointment with data:", appointmentData);
     
-    // Show toast notification
-    showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
-    
-    // Close scheduler
-    setSchedulerVisible(false);
+    try {
+      // Add appointment to the store
+      const appointment = await addAppointment({
+        date: appointmentData.date,
+        time: appointmentData.time,
+        reason: appointmentData.reason,
+        notes: appointmentData.notes,
+        patientId: appointmentData.patientId,
+        status: 'pending'
+      });
+      
+      // Display success message
+      showToast(`Appointment scheduled for ${formatDate(appointment.date)} at ${appointment.time}`, "success");
+      
+      // Close scheduler dialog
+      setSchedulerVisible(false);
+      setSelectedPatientId(null);
+    } catch (error) {
+      console.error("Error scheduling appointment:", error);
+      showToast("Error scheduling appointment", "error");
+    }
   };
   
   const openScheduler = (patientId: string) => {
@@ -135,7 +144,7 @@ export default function ExploreScreen() {
     // Close the dialog and refresh patients list
     setPatientFormVisible(false);
     // Re-fetch patients
-    setFilteredPatients(getPatientsArray());
+    setFilteredPatients(patients);
   };
 
   const renderPatientItem = ({ item }: { item: Patient }) => (

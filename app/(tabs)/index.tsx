@@ -544,8 +544,8 @@ export default function HomeScreen() {
         
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText>
-          </View>
-        
+        </View>
+
         <View style={styles.quickActions}>
           <TouchableRipple 
             style={styles.actionButton} 
@@ -568,7 +568,7 @@ export default function HomeScreen() {
             <View>
               <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
                 <FontAwesome5 name="calendar-plus" size={18} color="#4CAF50" />
-              </View>
+          </View>
               <ThemedText style={styles.actionText}>Schedule</ThemedText>
             </View>
           </TouchableRipple>
