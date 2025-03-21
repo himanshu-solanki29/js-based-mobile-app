@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, FlatList, TouchableOpacity, View, TextInput, ScrollView, Modal, Platform, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -29,7 +29,8 @@ import {
   useTheme,
   Appbar,
   TextInput as PaperTextInput,
-  Menu
+  Menu,
+  Snackbar
 } from 'react-native-paper';
 import { 
   Appointment, 
@@ -40,6 +41,30 @@ import {
   useAppointments
 } from '@/utils/appointmentStore';
 import { getPatientById } from '@/utils/patientStore';
+
+// First, define status color constants at the top of the file
+const STATUS_COLORS = {
+  confirmed: {
+    bg: '#E8F5E9',
+    text: '#2E7D32',
+    accent: '#4CAF50'
+  },
+  pending: {
+    bg: '#FFF3E0',
+    text: '#E65100',
+    accent: '#FF9800'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#1565C0',
+    accent: '#2196F3'
+  },
+  cancelled: {
+    bg: '#FFEBEE',
+    text: '#C62828',
+    accent: '#F44336'
+  }
+};
 
 export default function AppointmentsScreen() {
   const router = useRouter();
@@ -406,85 +431,30 @@ export default function AppointmentsScreen() {
   // Define status options for filter chips
   const statusOptions = ['confirmed', 'pending', 'completed', 'cancelled', 'all'] as const;
 
-  // Function to render the status badge
+  // Update the renderStatusBadge function
   const renderStatusBadge = (status: AppointmentStatus) => {
-    let bgColor, textColor;
-    
-    switch (status) {
-      case 'confirmed':
-        bgColor = '#E8F5E9';
-        textColor = '#2E7D32';
-        break;
-      case 'pending':
-        bgColor = '#FFF3E0';
-        textColor = '#E65100';
-        break;
-      case 'cancelled':
-        bgColor = '#FFEBEE';
-        textColor = '#C62828';
-        break;
-      case 'completed':
-        bgColor = '#E3F2FD';
-        textColor = '#1565C0';
-        break;
-      default:
-        bgColor = '#F5F5F5';
-        textColor = '#757575';
-    }
+    const colors = STATUS_COLORS[status] || STATUS_COLORS.confirmed;
     
     return (
-      <View style={[styles.statusBadge, { backgroundColor: bgColor }]}>
-        <ThemedText style={[styles.statusText, { color: textColor }]}>
+      <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
+        <ThemedText style={[styles.statusText, { color: colors.text }]}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
-            </ThemedText>
+        </ThemedText>
       </View>
     );
   };
 
+  // Update the renderAppointmentItem to remove the 3-dots menu and use consistent colors
   const renderAppointmentItem = ({ item }: { item: Appointment }) => {
     // Ensure we're always using the latest patient name from the store
     const patientName = getPatientName(item.patientId);
     
-    // Get date styles based on status
-    const isStatusPending = item.status === 'pending';
-    
-    // Show completion dialog
-    const openCompletionDialog = () => {
-      setAppointmentToComplete(item);
-      setCompletionRemarks('');
-      setCompletionDialogVisible(true);
-    };
-    
-    // Add back the confirm appointment function
-    const confirmAppointment = () => {
-      // Update the appointment status
-      updateAppointmentStatus(item.id, 'confirmed');
-      
-      // Update the filtered list
-      setFilteredAppointments([...filteredAppointments]);
-    };
-
-    // Add proper completeAppointment function for the dialog
-    const completeAppointment = () => {
-      if (appointmentToComplete) {
-        // Update the appointment status and patient history
-        updateAppointmentStatus(
-          appointmentToComplete.id, 
-          'completed', 
-          completionRemarks.trim()
-        );
-        
-        // Update the filtered list
-        setFilteredAppointments([...filteredAppointments]);
-        
-        // Close dialog
-        setCompletionDialogVisible(false);
-      }
-    };
+    // Get status colors
+    const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.confirmed;
     
     return (
       <Card 
-        style={styles.appointmentCard} 
+        style={styles.appointmentCard}
         mode="elevated"
         onPress={() => router.push(`/appointment/${item.id}`)}
       >
@@ -492,17 +462,17 @@ export default function AppointmentsScreen() {
           <View style={styles.appointmentRow}>
             <View style={[
               styles.dateBox, 
-              isStatusPending ? styles.pendingDateBox : {}
+              { backgroundColor: statusColors.bg }
             ]}>
               <ThemedText style={[
                 styles.dateDay,
-                isStatusPending ? styles.pendingDateText : {}
+                { color: statusColors.text }
               ]}>
                 {new Date(item.date).getDate()}
               </ThemedText>
               <ThemedText style={[
                 styles.dateMonth,
-                isStatusPending ? styles.pendingDateText : {}
+                { color: statusColors.text }
               ]}>
                 {new Date(item.date).toLocaleString('default', { month: 'short' })}
               </ThemedText>
@@ -513,16 +483,16 @@ export default function AppointmentsScreen() {
                 <ThemedText style={styles.patientName}>{patientName}</ThemedText>
                 <View style={[
                   styles.statusBadge,
-                  item.status === 'pending' ? styles.pendingBadge : {}
+                  { backgroundColor: statusColors.bg }
                 ]}>
                   <ThemedText style={[
                     styles.statusText,
-                    item.status === 'pending' ? styles.pendingStatusText : {}
-                  ]}>{item.status}</ThemedText>
+                    { color: statusColors.text }
+                  ]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</ThemedText>
                 </View>
               </View>
               <ThemedText style={styles.appointmentTime}>
-                <FontAwesome5 name="clock" size={12} color={isStatusPending ? "#FF9800" : "#4CAF50"} /> {item.time}
+                <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
               </ThemedText>
               <ThemedText style={styles.reasonText}>{item.reason}</ThemedText>
               
@@ -533,146 +503,6 @@ export default function AppointmentsScreen() {
                 </View>
               )}
             </View>
-          </View>
-          
-          {/* Appointment actions */}
-          <View style={styles.actionButtonsContainer}>
-            {item.status === 'pending' && (
-              <Menu
-                anchor={
-                  <IconButton 
-                    icon="dots-vertical" 
-                    size={20}
-                    style={{margin: 0, marginLeft: 16}}
-                    iconColor="#4CAF50"
-                    onPress={() => {
-                      setSelectedAppointment(item);
-                      setMenuVisible(true);
-                    }}
-                  />
-                }
-                visible={menuVisible && selectedAppointment?.id === item.id}
-                onDismiss={() => setMenuVisible(false)}
-                style={styles.menu}
-                contentStyle={styles.menuContent}
-              >
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    router.push(`/appointment/${item.id}`);
-                  }}
-                  title="View Details" 
-                  leadingIcon={props => <FontAwesome5 name="eye" size={16} color="#4CAF50" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    confirmAppointment();
-                  }}
-                  title="Confirm Appointment" 
-                  leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    // Handle cancellation using the new function
-                    updateAppointmentStatus(item.id, 'cancelled');
-                    setFilteredAppointments([...filteredAppointments]);
-                  }}
-                  title="Cancel Appointment" 
-                  leadingIcon={props => <FontAwesome5 name="times-circle" size={16} color="#F44336" {...props} />}
-                  titleStyle={{color: '#F44336', fontWeight: '500', fontSize: 14}}
-                  style={styles.menuItem}
-                />
-                <Divider style={{marginVertical: 2}} />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    alert(`Calling ${patientName}...`);
-                  }}
-                  title="Call Patient" 
-                  leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    alert(`Sending message to ${patientName}...`);
-                  }}
-                  title="Message Patient" 
-                  leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-              </Menu>
-            )}
-            {item.status === 'confirmed' && (
-              <Menu
-                anchor={
-                  <IconButton 
-                    icon="dots-vertical" 
-                    size={20}
-                    style={{margin: 0, marginLeft: 16}}
-                    iconColor="#4CAF50"
-                    onPress={() => {
-                      setSelectedAppointment(item);
-                      setMenuVisible(true);
-                    }}
-                  />
-                }
-                visible={menuVisible && selectedAppointment?.id === item.id}
-                onDismiss={() => setMenuVisible(false)}
-                style={styles.menu}
-                contentStyle={styles.menuContent}
-              >
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    router.push(`/appointment/${item.id}`);
-                  }}
-                  title="View Details" 
-                  leadingIcon={props => <FontAwesome5 name="eye" size={16} color="#4CAF50" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    openCompletionDialog();
-                  }}
-                  title="Mark Completed" 
-                  leadingIcon={props => <FontAwesome5 name="check-circle" size={16} color="#4CAF50" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Divider style={{marginVertical: 2}} />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    alert(`Calling ${patientName}...`);
-                  }}
-                  title="Call Patient" 
-                  leadingIcon={props => <FontAwesome5 name="phone" size={16} color="#2196F3" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-                <Menu.Item 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    alert(`Sending message to ${patientName}...`);
-                  }}
-                  title="Message Patient" 
-                  leadingIcon={props => <FontAwesome5 name="comment" size={16} color="#2196F3" {...props} />}
-                  style={styles.menuItem}
-                  titleStyle={{fontWeight: '500', fontSize: 14}}
-                />
-              </Menu>
-            )}
           </View>
         </Card.Content>
       </Card>
@@ -687,27 +517,72 @@ export default function AppointmentsScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    // Create new appointment
+    // Create new appointment with pending status
     const newAppointment = addAppointment({
       date: appointmentData.date,
       time: appointmentData.time,
       reason: appointmentData.reason,
       notes: appointmentData.notes || '',
       patientId: appointmentData.patientId,
-      status: 'confirmed'
+      status: 'pending' // Changed from 'confirmed' to 'pending'
     });
     
     // No need to manually update the state here - the useAppointments hook will handle it
     setSchedulerVisible(false);
     setScheduleSuccess(true);
     
+    // Show a toast or snackbar message
+    setSuccessMessage(`Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`);
+    
     setTimeout(() => {
       setScheduleSuccess(false);
+      setSuccessMessage('');
     }, 3000);
   };
 
   // Add after other state variables
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Update the renderStatusFilter function to use the STATUS_COLORS
+  const renderStatusFilter = () => {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statusFilter}
+      >
+        {statusOptions.map((option) => {
+          const isSelected = selectedStatus === option;
+          const chipColors = option !== 'all' 
+            ? STATUS_COLORS[option as AppointmentStatus] 
+            : { bg: '#f0f0f0', text: '#757575', accent: '#757575' };
+          
+          return (
+            <Chip
+              key={option}
+              selected={isSelected}
+              onPress={() => setSelectedStatus(option)}
+              style={[
+                styles.statusChip,
+                { 
+                  backgroundColor: isSelected ? chipColors.bg : 'transparent',
+                  borderColor: chipColors.accent,
+                  borderWidth: isSelected ? 0 : 1
+                }
+              ]}
+              textStyle={{
+                color: isSelected ? chipColors.text : chipColors.accent,
+                fontWeight: isSelected ? 'bold' : 'normal'
+              }}
+            >
+              {option === 'all' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
+            </Chip>
+          );
+        })}
+      </ScrollView>
+    );
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -734,31 +609,7 @@ export default function AppointmentsScreen() {
       />
 
       <View style={styles.filtersContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusFilter}>
-          {statusOptions.map(status => (
-            <Chip
-              key={status}
-              selected={selectedStatus === status}
-              onPress={() => setSelectedStatus(status === selectedStatus ? 'all' : status)}
-              style={[
-                styles.statusChip, 
-                {
-                  borderColor: '#4CAF50',
-                  backgroundColor: selectedStatus === status ? '#4CAF50' : 'transparent'
-                }
-              ]}
-              mode={selectedStatus === status ? "flat" : "outlined"}
-              selectedColor="#ffffff"
-              textStyle={{ 
-                color: selectedStatus === status ? '#ffffff' : '#4CAF50',
-                fontWeight: selectedStatus === status ? 'bold' : 'normal',
-                fontSize: 14
-              }}
-            >
-              {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-            </Chip>
-          ))}
-        </ScrollView>
+        {renderStatusFilter()}
 
         <TouchableRipple
           style={[
@@ -886,6 +737,20 @@ export default function AppointmentsScreen() {
         color="#ffffff"
         onPress={() => setSchedulerVisible(true)}
       />
+
+      {/* Success message snackbar */}
+      <Snackbar
+        visible={scheduleSuccess}
+        onDismiss={() => setScheduleSuccess(false)}
+        duration={3000}
+        style={{ backgroundColor: '#4CAF50' }}
+        action={{
+          label: 'OK',
+          onPress: () => setScheduleSuccess(false),
+        }}
+      >
+        {successMessage}
+      </Snackbar>
     </ThemedView>
   );
 }
@@ -961,153 +826,113 @@ const styles = StyleSheet.create({
   },
   appointmentCard: {
     marginBottom: 12,
-    borderRadius: 16, // iOS-style more rounded cards
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'white', // Light green background for cards
+    backgroundColor: 'white',
+    borderWidth: 0,
+    elevation: 2,
   },
-  appointmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  cardContent: {
+    padding: 16,
   },
   appointmentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    flex: 1,
+    width: '100%',
   },
   dateBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8F5E9',
     borderRadius: 10,
     padding: 8,
     width: 48,
     height: 48,
   },
-  pendingDateBox: {
-    backgroundColor: '#FFF3E0',
-  },
   dateDay: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  pendingDateText: {
-    color: '#E65100',
   },
   dateMonth: {
     fontSize: 12,
-    color: '#2E7D32',
   },
   appointmentDetails: {
     flex: 1,
     marginLeft: 12,
-    marginRight: 8,
   },
   appointmentHeaderInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
   },
   patientName: {
     fontSize: 16,
     fontWeight: 'bold',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusText: {
+    fontWeight: '600',
+    fontSize: 12,
+    textTransform: 'capitalize',
   },
   appointmentTime: {
     fontSize: 12,
     color: '#757575',
     marginTop: 2,
   },
-  statusBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pendingBadge: {
-    backgroundColor: '#FFF3E0',
-  },
-  statusText: {
-    color: '#2E7D32',
-    fontWeight: '600',
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  pendingStatusText: {
-    color: '#E65100',
-  },
   reasonText: {
-    fontSize: 14,
     marginTop: 4,
+    fontSize: 14,
   },
   notesLabel: {
-    fontWeight: '600',
-    color: '#757575',
     fontSize: 12,
+    fontWeight: 'bold',
   },
   notesText: {
-    fontSize: 14,
+    fontSize: 12,
     fontStyle: 'italic',
-    color: '#616161',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  menu: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    elevation: 4,
-  },
-  menuItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginVertical: 1,
   },
   dialog: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    elevation: 4,
-    padding: 4,
+    borderRadius: 8,
+    maxWidth: 340,
+    margin: 24,
   },
   dialogTitle: {
+    textAlign: 'center',
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333333',
-    fontSize: 16,
-    marginBottom: 4,
+    marginVertical: 12,
   },
   dialogText: {
+    textAlign: 'center',
     marginBottom: 12,
-    fontSize: 14,
   },
   remarksInput: {
-    backgroundColor: '#f8f9fa',
-    marginBottom: 4,
-    fontSize: 14,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
   },
   dialogActions: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-    paddingTop: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
   },
   fab: {
     position: 'absolute',
     margin: 16,
     right: 0,
     bottom: 0,
-    borderRadius: 28,
     backgroundColor: '#4CAF50',
-  },
-  menuContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    elevation: 4,
-    padding: 8,
-  },
-  cardContent: {
-    padding: 16,
   },
 }); 
