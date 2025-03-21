@@ -1,6 +1,6 @@
 import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -27,6 +27,31 @@ import { getPatientById } from "@/utils/patientStore";
 import { AppointmentStatus } from "@/utils/types";
 import { MedicalRecordForm } from "@/components/MedicalRecordForm";
 import { MedicalRecordCard } from "@/components/MedicalRecordCard";
+import { useGlobalToast } from "@/components/GlobalToastProvider";
+
+// Define status colors for consistent styling
+const STATUS_COLORS = {
+  confirmed: {
+    bg: '#E8F5E9',
+    text: '#2E7D32',
+    accent: '#4CAF50'
+  },
+  pending: {
+    bg: '#FFF3E0',
+    text: '#E65100',
+    accent: '#FF9800'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#0D47A1',
+    accent: '#2196F3'
+  },
+  cancelled: {
+    bg: '#FFEBEE',
+    text: '#B71C1C',
+    accent: '#F44336'
+  }
+};
 
 // Define the MedicalRecord interface directly here to avoid any import issues
 interface MedicalRecord {
@@ -40,6 +65,7 @@ interface MedicalRecord {
 export default function AppointmentDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { showToast } = useGlobalToast();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +85,20 @@ export default function AppointmentDetailsScreen() {
   const [statusChangeDialogVisible, setStatusChangeDialogVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null);
   const [statusChangeNotes, setStatusChangeNotes] = useState("");
+  
+  // States for UI updates
+  const [actionInProgress, setActionInProgress] = useState(false);
+  
+  // New state for status transition animation
+  const [statusChanged, setStatusChanged] = useState(false);
+  
+  // This effect is triggered when appointment status changes and updates all states
+  useEffect(() => {
+    if (appointment) {
+      // Reset action in progress when appointment status changes
+      setActionInProgress(false);
+    }
+  }, [appointment?.status]);
   
   useEffect(() => {
     // Find the appointment in our data
@@ -83,27 +123,36 @@ export default function AppointmentDetailsScreen() {
     setLoading(false);
   }, [id]);
   
-  // Updated handleCompletionWithMedicalRecord function to use the MedicalRecord interface
-  const handleCompletionWithMedicalRecord = () => {
+  // Function to handle completion with medical record
+  const handleCompletionWithMedicalRecord = (medicalData: MedicalRecord) => {
     if (!appointment) return;
     
-    // Create a combined note with all medical record information
-    const fullNotes = `Complaint: ${medicalRecord.complaint || appointment.reason}\nDiagnosis: ${medicalRecord.diagnosis || 'No diagnosis provided'}\nBlood Pressure: ${medicalRecord.bloodPressure || 'Not recorded'}\nWeight: ${medicalRecord.weight || 'Not recorded'}\nPrescription: ${medicalRecord.prescription || 'No prescription'}`; 
+    // Disable actions while in progress
+    setActionInProgress(true);
     
-    // Update the appointment status with the combined notes
+    // Create combined note with medical record information
+    const medicalRecordNote = `Complaint: ${medicalData.complaint}\nDiagnosis: ${medicalData.diagnosis}\nBlood Pressure: ${medicalData.bloodPressure}\nWeight: ${medicalData.weight}\nPrescription: ${medicalData.prescription}`;
+    
+    // Update appointment status to completed with medical record
     const updatedAppointment = updateAppointmentStatus(
       appointment.id,
       'completed',
-      fullNotes
+      medicalRecordNote
     );
     
     if (updatedAppointment) {
+      // Show status changed animation
+      setStatusChanged(true);
+      setTimeout(() => setStatusChanged(false), 2000);
+      
       setAppointment(updatedAppointment);
-      Alert.alert(
-        "Appointment Completed",
-        "Appointment has been marked as completed with medical record.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
+      
+      // Show success notification
+      showToast("Appointment has been completed with medical record", "success");
+    } else {
+      // Show error notification
+      showToast("Failed to update appointment status", "error");
+      setActionInProgress(false);
     }
   };
   
@@ -119,6 +168,10 @@ export default function AppointmentDetailsScreen() {
   const handleStatusChange = () => {
     if (!appointment || !selectedStatus) return;
     
+    // Disable actions while in progress
+    setActionInProgress(true);
+    
+    // Update appointment status
     const updatedAppointment = updateAppointmentStatus(
       appointment.id,
       selectedStatus,
@@ -126,16 +179,31 @@ export default function AppointmentDetailsScreen() {
     );
     
     if (updatedAppointment) {
+      // Show status changed animation
+      setStatusChanged(true);
+      setTimeout(() => setStatusChanged(false), 2000);
+      
       setAppointment(updatedAppointment);
+      
+      // Show success notification with appropriate type based on status
+      if (selectedStatus === 'confirmed') {
+        showToast(`Appointment has been confirmed`, "success");
+      } else if (selectedStatus === 'cancelled') {
+        showToast(`Appointment has been cancelled`, "warning");
+      } else if (selectedStatus === 'completed') {
+        showToast(`Appointment has been completed`, "success");
+      } else {
+        showToast(`Appointment status updated to ${selectedStatus}`, "info");
+      }
+      
+      // Reset form state
       setStatusChangeDialogVisible(false);
       setSelectedStatus(null);
       setStatusChangeNotes("");
-      
-      Alert.alert(
-        "Status Updated",
-        `Appointment has been marked as ${selectedStatus}.`,
-        [{ text: "OK" }]
-      );
+    } else {
+      // Show error notification
+      showToast("Failed to update appointment status", "error");
+      setActionInProgress(false);
     }
   };
   
@@ -176,24 +244,6 @@ export default function AppointmentDetailsScreen() {
   // Format appointment date
   const formattedDate = formatDate(appointment.date);
   const formattedDateTime = `${formattedDate} at ${appointment.time}`;
-  
-  // Determine status color scheme
-  const getStatusColors = () => {
-    switch (appointment.status) {
-      case 'confirmed':
-        return { backgroundColor: '#E8F5E9', textColor: '#2E7D32' };
-      case 'pending':
-        return { backgroundColor: '#FFF3E0', textColor: '#E65100' };
-      case 'cancelled':
-        return { backgroundColor: '#FFEBEE', textColor: '#C62828' };
-      case 'completed':
-        return { backgroundColor: '#E0F2F1', textColor: '#00695C' };
-      default:
-        return { backgroundColor: '#E8F5E9', textColor: '#2E7D32' };
-    }
-  };
-  
-  const statusColors = getStatusColors();
   
   return (
     <ThemedView style={styles.container}>
@@ -249,14 +299,28 @@ export default function AppointmentDetailsScreen() {
         )}
       </Appbar.Header>
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 32}}>
         {/* Appointment Header */}
         <Surface style={styles.headerCard} elevation={1}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColors.backgroundColor }]}>
-              <ThemedText style={[styles.statusText, { color: statusColors.textColor }]}>
-                {appointment.status}
-              </ThemedText>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTitleRow}>
+              <View 
+                style={[
+                  styles.statusBadge, 
+                  { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.pending.bg },
+                  statusChanged && styles.statusBadgeHighlight
+                ]}
+              >
+                <ThemedText 
+                  style={[
+                    styles.statusText, 
+                    { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.pending.text },
+                    statusChanged && styles.statusTextHighlight
+                  ]}
+                >
+                  {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                </ThemedText>
+              </View>
             </View>
             
             <ThemedText style={styles.appointmentDateTime}>
@@ -298,6 +362,9 @@ export default function AppointmentDetailsScreen() {
             </ThemedText>
             <ThemedText style={styles.patientDetail}>
               <FontAwesome5 name="envelope" size={14} color="#4CAF50" style={styles.detailIcon} /> {patient.email}
+            </ThemedText>
+            <ThemedText style={styles.patientDetail}>
+              <FontAwesome5 name="id-card" size={14} color={STATUS_COLORS[appointment.status]?.accent || '#4CAF50'} style={styles.detailIcon} /> {patient.id}
             </ThemedText>
           </View>
           
@@ -356,6 +423,7 @@ export default function AppointmentDetailsScreen() {
         {/* Medical Record Form for confirmed appointments */}
         {appointment.status === 'confirmed' && (
           <MedicalRecordForm
+            key={`med-record-form-${appointment.status}`}
             initialValues={{
               complaint: appointment.reason,
               bloodPressure: patient.bloodPressure || '',
@@ -363,6 +431,8 @@ export default function AppointmentDetailsScreen() {
             }}
             onSubmit={handleCompletionWithMedicalRecord}
             submitButtonText="Complete Appointment"
+            disabled={actionInProgress}
+            loading={actionInProgress}
           />
         )}
         
@@ -378,7 +448,7 @@ export default function AppointmentDetailsScreen() {
             Back
           </Button>
           
-          {appointment.status === 'pending' && (
+          {appointment.status === 'pending' && !actionInProgress && (
             <View style={styles.buttonGroup}>
               <Button 
                 mode="outlined"
@@ -386,6 +456,7 @@ export default function AppointmentDetailsScreen() {
                 style={styles.cancelAppointmentButton}
                 textColor="#F44336"
                 onPress={() => openStatusChangeDialog('cancelled')}
+                disabled={actionInProgress}
               >
                 Cancel
               </Button>
@@ -396,6 +467,7 @@ export default function AppointmentDetailsScreen() {
                 buttonColor="#4CAF50"
                 textColor="#FFFFFF"
                 onPress={() => openStatusChangeDialog('confirmed')}
+                disabled={actionInProgress}
               >
                 Confirm
               </Button>
@@ -407,7 +479,7 @@ export default function AppointmentDetailsScreen() {
       {/* Status Change Dialog */}
       <Dialog 
         visible={statusChangeDialogVisible} 
-        onDismiss={() => setStatusChangeDialogVisible(false)}
+        onDismiss={() => !actionInProgress && setStatusChangeDialogVisible(false)}
         style={styles.dialog}
       >
         <Dialog.Title style={styles.dialogTitle}>
@@ -418,10 +490,7 @@ export default function AppointmentDetailsScreen() {
               selectedStatus === 'pending' ? 'clock' : 'calendar-check'
             } 
             size={16} 
-            color={
-              selectedStatus === 'confirmed' || selectedStatus === 'pending' ? '#4CAF50' : 
-              selectedStatus === 'cancelled' ? '#F44336' : '#4CAF50'
-            } 
+            color={STATUS_COLORS[selectedStatus]?.accent || '#757575'} 
             style={{marginRight: 6}} 
           />
           {selectedStatus === 'confirmed' ? 'Confirm Appointment' :
@@ -447,6 +516,7 @@ export default function AppointmentDetailsScreen() {
             numberOfLines={2}
             outlineColor="#E0E0E0"
             activeOutlineColor="#4CAF50"
+            disabled={actionInProgress}
           />
         </Dialog.Content>
         
@@ -454,17 +524,17 @@ export default function AppointmentDetailsScreen() {
           <Button 
             onPress={() => setStatusChangeDialogVisible(false)} 
             textColor="#757575"
+            disabled={actionInProgress}
           >
             Cancel
           </Button>
           <Button 
             onPress={handleStatusChange}
             mode="contained"
-            buttonColor={
-              selectedStatus === 'confirmed' || selectedStatus === 'pending' ? '#4CAF50' : 
-              selectedStatus === 'cancelled' ? '#F44336' : '#4CAF50'
-            }
+            buttonColor={STATUS_COLORS[selectedStatus]?.accent || '#757575'}
             style={{borderRadius: 8}}
+            disabled={actionInProgress}
+            loading={actionInProgress}
           >
             {selectedStatus === 'confirmed' ? 'Confirm' :
              selectedStatus === 'cancelled' ? 'Cancel Appointment' :
@@ -508,21 +578,44 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     overflow: 'hidden',
   },
-  statusHeader: {
+  headerContent: {
     padding: 16,
     flexDirection: 'column',
     alignItems: 'flex-start',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
-    marginBottom: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadgeHighlight: {
+    transform: [{scale: 1.1}],
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   statusText: {
     fontWeight: '600',
     fontSize: 14,
     textTransform: 'capitalize',
+  },
+  statusTextHighlight: {
+    fontWeight: '700',
   },
   appointmentDateTime: {
     fontSize: 16,

@@ -211,10 +211,10 @@ export const updateAppointmentStatus = (
   if (newStatus === 'completed' && oldStatus !== 'completed') {
     const patient = getPatientById(appointment.patientId);
     if (patient) {
-      // Extract medical information from notes if provided
+      // Initialize with default values
       const medicalRecord: MedicalRecord = {
         complaint: appointment.reason,
-        diagnosis: 'No diagnosis recorded',
+        diagnosis: 'No diagnosis recorded', // Default value
         bloodPressure: patient.bloodPressure || 'Not measured',
         weight: patient.weight || 'Not measured',
         prescription: 'No prescription recorded'

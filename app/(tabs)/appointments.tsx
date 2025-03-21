@@ -41,6 +41,7 @@ import {
   useAppointments
 } from '@/utils/appointmentStore';
 import { getPatientById } from '@/utils/patientStore';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
 
 // First, define status color constants at the top of the file
 const STATUS_COLORS = {
@@ -70,6 +71,7 @@ export default function AppointmentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const theme = useTheme();
+  const { showToast } = useGlobalToast();
   const { appointments, upcomingAppointments, pastAppointments } = useAppointments();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -529,20 +531,13 @@ export default function AppointmentsScreen() {
     
     // No need to manually update the state here - the useAppointments hook will handle it
     setSchedulerVisible(false);
-    setScheduleSuccess(true);
     
-    // Show a toast or snackbar message
-    setSuccessMessage(`Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`);
-    
-    setTimeout(() => {
-      setScheduleSuccess(false);
-      setSuccessMessage('');
-    }, 3000);
+    // Show toast notification
+    showToast(
+      `Appointment scheduled for ${appointmentData.patientName} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
+      'success'
+    );
   };
-
-  // Add after other state variables
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
 
   // Update the renderStatusFilter function to use the STATUS_COLORS
   const renderStatusFilter = () => {
@@ -737,20 +732,6 @@ export default function AppointmentsScreen() {
         color="#ffffff"
         onPress={() => setSchedulerVisible(true)}
       />
-
-      {/* Success message snackbar */}
-      <Snackbar
-        visible={scheduleSuccess}
-        onDismiss={() => setScheduleSuccess(false)}
-        duration={3000}
-        style={{ backgroundColor: '#4CAF50' }}
-        action={{
-          label: 'OK',
-          onPress: () => setScheduleSuccess(false),
-        }}
-      >
-        {successMessage}
-      </Snackbar>
     </ThemedView>
   );
 }
