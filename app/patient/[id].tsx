@@ -652,12 +652,12 @@ const styles = StyleSheet.create({
   },
   appBar: {
     backgroundColor: '#4CAF50',
-    elevation: 4,
+    elevation: 0,
   },
   appBarTitle: {
     color: 'white',
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: 'normal',
   },
   profileCard: {
     marginTop: 16,
