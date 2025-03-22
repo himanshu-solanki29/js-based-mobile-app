@@ -84,12 +84,8 @@ export function AppointmentScheduler({
   
   // Initialize patients list on mount
   useEffect(() => {
-    // Filter out dummy data (patients with IDs 1-5)
-    const realPatients = patients.filter(patient => {
-      const idNumber = parseInt(patient.id);
-      return !(idNumber >= 1 && idNumber <= 5);
-    });
-    setFilteredPatients(realPatients);
+    // Use all patients without filtering
+    setFilteredPatients(patients);
   }, [patients]);
 
   // Find patient by ID effect
@@ -162,17 +158,11 @@ export function AppointmentScheduler({
   
   // Filter patients based on search query
   useEffect(() => {
-    // First filter out dummy patients (IDs 1-5)
-    const realPatients = patients.filter(patient => {
-      const idNumber = parseInt(patient.id);
-      return !(idNumber >= 1 && idNumber <= 5);
-    });
-    
     if (patientSearch.trim() === '') {
-      setFilteredPatients(realPatients);
+      setFilteredPatients(patients);
     } else {
       const query = patientSearch.toLowerCase();
-      const filtered = realPatients.filter(patient => 
+      const filtered = patients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );

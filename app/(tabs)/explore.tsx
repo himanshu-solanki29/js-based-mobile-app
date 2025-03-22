@@ -42,27 +42,24 @@ export default function ExploreScreen() {
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
   
-  // Use all patients directly without filtering dummy data
-  const realPatients = patients;
-
   // Initialize filtered patients on component mount and when patients change
   useEffect(() => {
-    setFilteredPatients(realPatients);
-  }, [realPatients]);
+    setFilteredPatients(patients);
+  }, [patients]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(realPatients);
+      setFilteredPatients(patients);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = realPatients.filter(patient => 
+      const filtered = patients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, realPatients]);
+  }, [searchQuery, patients]);
 
   const handleScheduleAppointment = async (appointmentData: {
     date: Date;
