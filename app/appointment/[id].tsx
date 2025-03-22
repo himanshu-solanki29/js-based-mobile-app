@@ -480,37 +480,51 @@ export default function AppointmentDetailsScreen() {
           
           <View style={styles.patientInfoContainer}>
             <ThemedText style={styles.patientName}>{patient.name}</ThemedText>
-            <View style={styles.patientDetailRow}>
-              <View style={styles.patientDetailIconContainer}>
-                <FontAwesome5 name="user-alt" size={14} color="#4CAF50" />
+            
+            <View style={styles.patientDetailsGrid}>
+              {/* Age and gender */}
+              <View style={styles.patientDetailItem}>
+                <View style={styles.patientDetailIconWrapper}>
+                  <FontAwesome5 name="user-alt" size={14} color="#4CAF50" />
+                </View>
+                <ThemedText style={styles.patientDetailText}>
+                  {patient.age} years • {patient.gender}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.patientDetail}>
-                {patient.age} years • {patient.gender}
-              </ThemedText>
-            </View>
-            <View style={styles.patientDetailRow}>
-              <View style={styles.patientDetailIconContainer}>
-                <FontAwesome5 name="phone" size={14} color="#4CAF50" />
+              
+              {/* Phone */}
+              <View style={styles.patientDetailItem}>
+                <View style={styles.patientDetailIconWrapper}>
+                  <FontAwesome5 name="phone" size={14} color="#4CAF50" />
+                </View>
+                <ThemedText style={styles.patientDetailText}>
+                  {patient.phone}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.patientDetail}>
-                {patient.phone}
-              </ThemedText>
-            </View>
-            <View style={styles.patientDetailRow}>
-              <View style={styles.patientDetailIconContainer}>
-                <FontAwesome5 name="envelope" size={14} color="#4CAF50" />
+              
+              {/* Email */}
+              <View style={styles.patientDetailItem}>
+                <View style={styles.patientDetailIconWrapper}>
+                  <FontAwesome5 name="envelope" size={14} color="#4CAF50" />
+                </View>
+                <ThemedText style={styles.patientDetailText}>
+                  {patient.email}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.patientDetail}>
-                {patient.email}
-              </ThemedText>
-            </View>
-            <View style={styles.patientDetailRow}>
-              <View style={styles.patientDetailIconContainer}>
-                <FontAwesome5 name="id-card" size={14} color={STATUS_COLORS[appointment.status]?.accent || '#4CAF50'} />
+              
+              {/* ID */}
+              <View style={styles.patientDetailItem}>
+                <View style={styles.patientDetailIconWrapper}>
+                  <FontAwesome5 
+                    name="id-card" 
+                    size={14} 
+                    color={STATUS_COLORS[appointment.status]?.accent || '#4CAF50'} 
+                  />
+                </View>
+                <ThemedText style={styles.patientDetailText}>
+                  {patient.id}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.patientDetail}>
-                {patient.id}
-              </ThemedText>
             </View>
           </View>
           
@@ -903,30 +917,28 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  patientDetailsGrid: {
+    width: '100%',
     marginBottom: 8,
   },
-  patientDetail: {
-    fontSize: 14,
-    color: '#555555',
-    marginBottom: 8,
-    flex: 1,
-  },
-  detailIcon: {
-    marginRight: 4,
-    width: 20,
-    textAlign: 'center',
-  },
-  patientDetailRow: {
+  patientDetailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     width: '100%',
   },
-  patientDetailIconContainer: {
+  patientDetailIconWrapper: {
     width: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
+  },
+  patientDetailText: {
+    fontSize: 14,
+    color: '#555555',
+    flex: 1,
   },
   actionButtons: {
     flexDirection: 'row',
