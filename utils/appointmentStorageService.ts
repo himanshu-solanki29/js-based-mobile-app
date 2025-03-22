@@ -32,8 +32,8 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
       if (storedData && storedData.length > 0) {
         this.appointments = storedData;
       } else {
-        // Use initial data for first-time setup
-        this.appointments = INITIAL_APPOINTMENTS;
+        // Initialize with empty data, not dummy data
+        this.appointments = [];
         await this.saveData(this.appointments);
       }
       
@@ -44,8 +44,8 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
       console.error('Error initializing appointment storage:', error);
       // Still mark as initialized to prevent further initialization attempts
       this.initialized = true;
-      // Use default data if there was an error
-      this.appointments = INITIAL_APPOINTMENTS;
+      // Use empty data if there was an error
+      this.appointments = [];
     }
   }
   
@@ -342,6 +342,30 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
   // Notify all listeners of changes
   private notifyListeners() {
     this.listeners.forEach(callback => callback());
+  }
+  
+  // Delete an appointment by ID
+  async deleteAppointment(id: string): Promise<boolean> {
+    await this.ensureInitialized();
+    
+    // Find the appointment index
+    const appointmentIndex = this.appointments.findIndex(a => a.id === id);
+    
+    // Check if appointment exists
+    if (appointmentIndex === -1) {
+      return false;
+    }
+    
+    // Remove the appointment
+    this.appointments = [
+      ...this.appointments.slice(0, appointmentIndex),
+      ...this.appointments.slice(appointmentIndex + 1)
+    ];
+    
+    // Persist to storage
+    await this.persistAppointments();
+    
+    return true;
   }
 }
 

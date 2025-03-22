@@ -335,12 +335,18 @@ export default function SettingsScreen() {
         case 'showDummyData':
           setShowDummyData(value);
           
-          // Use dummyDataService to manage dummy data
-          await dummyDataService.setShowDummyDataSetting(value);
+          // Show processing toast
+          showToast(
+            value ? 'Adding dummy data...' : 'Removing dummy data...', 
+            'info'
+          );
+          
+          // Use dummyDataService to toggle dummy data
+          await dummyDataService.toggleDummyData(value);
           
           // Show success toast
           showToast(
-            value ? 'Dummy data shown' : 'Dummy data hidden', 
+            value ? 'Dummy data added' : 'Dummy data removed', 
             'success'
           );
           

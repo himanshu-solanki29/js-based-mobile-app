@@ -17,7 +17,7 @@ class DummyDataService {
   
   constructor() {
     // Store initial patient IDs (1-5)
-    this.initialPatientIds = Object.keys(INITIAL_PATIENTS);
+    this.initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
     
     // Store initial appointment IDs (1-7)
     this.initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
@@ -33,152 +33,100 @@ class DummyDataService {
         value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
       }
       
-      // Default to true if setting doesn't exist
-      return value === null ? true : value === 'true';
+      // Default to false if setting doesn't exist
+      return value === null ? false : value === 'true';
     } catch (error) {
       console.error('Error loading show dummy data setting:', error);
-      // Default to true on error
-      return true;
+      // Default to false on error
+      return false;
     }
   }
   
-  // Set the setting
-  async setShowDummyDataSetting(value: boolean): Promise<void> {
+  // Set the setting and apply changes
+  async toggleDummyData(enabled: boolean): Promise<void> {
     try {
-      const stringValue = value.toString();
+      console.log(`Toggling dummy data to: ${enabled}`);
+      
+      // Store the setting
+      const stringValue = enabled.toString();
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         localStorage.setItem(SHOW_DUMMY_DATA_KEY, stringValue);
       } else {
         await AsyncStorage.setItem(SHOW_DUMMY_DATA_KEY, stringValue);
       }
       
-      // Apply the setting
-      await this.applyDummyDataSetting(value);
+      // Apply the change
+      if (enabled) {
+        await this.addDummyData();
+      } else {
+        await this.removeDummyData();
+      }
+      
+      return Promise.resolve();
     } catch (error) {
-      console.error('Error setting show dummy data setting:', error);
-      throw error;
+      console.error('Error toggling dummy data:', error);
+      return Promise.reject(error);
     }
   }
   
-  // Apply the setting (show or hide dummy data)
-  async applyDummyDataSetting(showDummyData: boolean): Promise<void> {
-    if (showDummyData) {
-      await this.restoreDummyData();
-    } else {
-      await this.removeDummyData();
+  // Add dummy data to stores
+  private async addDummyData(): Promise<void> {
+    try {
+      console.log('Adding dummy data to stores');
+      
+      // Add dummy patients
+      const patientsToAdd = {};
+      Object.entries(INITIAL_PATIENTS).forEach(([id, patient]) => {
+        patientsToAdd[id] = patient;
+      });
+      
+      await patientStorageService.bulkAddPatients(patientsToAdd);
+      
+      // Add dummy appointments
+      await appointmentStorageService.bulkAddAppointments(INITIAL_APPOINTMENTS);
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error adding dummy data:', error);
+      return Promise.reject(error);
     }
   }
   
-  // Remove all dummy data from storage
+  // Remove dummy data from stores
   private async removeDummyData(): Promise<void> {
     try {
-      console.log('Removing dummy data');
+      console.log('Removing dummy data from stores');
       
-      // Load current patient data
-      const patientsData = await AsyncStorage.getItem(PATIENT_STORAGE_KEY);
-      if (patientsData) {
-        const patients = JSON.parse(patientsData);
-        
-        // Remove dummy patients
-        const filteredPatients = {};
-        Object.entries(patients).forEach(([id, patient]) => {
-          if (!this.initialPatientIds.includes(id)) {
-            filteredPatients[id] = patient;
-          }
-        });
-        
-        // Save filtered patients
-        await AsyncStorage.setItem(PATIENT_STORAGE_KEY, JSON.stringify(filteredPatients));
+      // Remove dummy patients
+      for (const id of this.initialPatientIds) {
+        await patientStorageService.deletePatient(id);
       }
       
-      // Load current appointment data
-      const appointmentsData = await AsyncStorage.getItem(APPOINTMENT_STORAGE_KEY);
-      if (appointmentsData) {
-        const appointments = JSON.parse(appointmentsData);
-        
-        // Remove dummy appointments
-        const filteredAppointments = appointments.filter(
-          appointment => !this.initialAppointmentIds.includes(appointment.id)
-        );
-        
-        // Save filtered appointments
-        await AsyncStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(filteredAppointments));
+      // Remove dummy appointments
+      for (const id of this.initialAppointmentIds) {
+        await appointmentStorageService.deleteAppointment(id);
       }
       
-      // Force the storage services to refresh their data
-      setTimeout(() => {
-        patientStorageService.initialize();
-        appointmentStorageService.initialize();
-      }, 0);
+      return Promise.resolve();
     } catch (error) {
       console.error('Error removing dummy data:', error);
-      throw error;
+      return Promise.reject(error);
     }
   }
   
-  // Restore all dummy data to storage
-  private async restoreDummyData(): Promise<void> {
+  // Check for and initialize dummy data if needed
+  async initializeDummyData(): Promise<void> {
     try {
-      console.log('Restoring dummy data');
+      const showDummyData = await this.getShowDummyDataSetting();
       
-      // Load current patient data
-      const patientsData = await AsyncStorage.getItem(PATIENT_STORAGE_KEY);
-      if (patientsData) {
-        const patients = JSON.parse(patientsData);
-        
-        // Merge with initial patients
-        const mergedPatients = {
-          ...patients
-        };
-        
-        // Add back all initial patients that don't exist
-        Object.entries(INITIAL_PATIENTS).forEach(([id, patient]) => {
-          if (!mergedPatients[id]) {
-            mergedPatients[id] = patient;
-          }
-        });
-        
-        // Save merged patients
-        await AsyncStorage.setItem(PATIENT_STORAGE_KEY, JSON.stringify(mergedPatients));
-      } else {
-        // If no patients exist, just use the initial data
-        await AsyncStorage.setItem(PATIENT_STORAGE_KEY, JSON.stringify(INITIAL_PATIENTS));
+      if (showDummyData) {
+        await this.addDummyData();
       }
       
-      // Load current appointment data
-      const appointmentsData = await AsyncStorage.getItem(APPOINTMENT_STORAGE_KEY);
-      if (appointmentsData) {
-        const appointments = JSON.parse(appointmentsData);
-        
-        // Get existing appointment IDs
-        const existingIds = new Set(appointments.map(appointment => appointment.id));
-        
-        // Find initial appointments that don't exist
-        const appointmentsToAdd = INITIAL_APPOINTMENTS.filter(
-          appointment => !existingIds.has(appointment.id)
-        );
-        
-        // Merge with existing
-        const mergedAppointments = [
-          ...appointments,
-          ...appointmentsToAdd
-        ];
-        
-        // Save merged appointments
-        await AsyncStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(mergedAppointments));
-      } else {
-        // If no appointments exist, just use the initial data
-        await AsyncStorage.setItem(APPOINTMENT_STORAGE_KEY, JSON.stringify(INITIAL_APPOINTMENTS));
-      }
-      
-      // Force the storage services to refresh their data
-      setTimeout(() => {
-        patientStorageService.initialize();
-        appointmentStorageService.initialize();
-      }, 0);
+      return Promise.resolve();
     } catch (error) {
-      console.error('Error restoring dummy data:', error);
-      throw error;
+      console.error('Error initializing dummy data:', error);
+      return Promise.reject(error);
     }
   }
 }
