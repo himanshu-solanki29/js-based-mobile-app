@@ -261,130 +261,99 @@ export default function PatientDetailsScreen() {
                   <FontAwesome5 name="venus-mars" size={12} color="#757575" style={{marginRight: 4}} /> {patient.gender}
                 </Text>
               </View>
-              <View style={styles.contactRow}>
-                <Button 
-                  icon="phone" 
-                  mode="text" 
-                  compact 
-                  style={styles.contactButton}
-                  labelStyle={styles.contactButtonLabel}
-                >
-                  Call
-                </Button>
-                <Button 
-                  icon="message-text-outline" 
-                  mode="text" 
-                  compact 
-                  style={styles.contactButton}
-                  labelStyle={styles.contactButtonLabel}
-                >
-                  Message
-                </Button>
-              </View>
             </View>
           </View>
         </Surface>
         
-        {/* Vital Stats */}
-        <View style={styles.vitalStatsContainer}>
-          <Surface style={styles.vitalStat} elevation={1}>
-            <TouchableRipple
-              rippleColor="rgba(0, 0, 0, 0.1)"
-              style={{borderRadius: 12}}
-              onPress={() => {}}
-            >
-              <View style={styles.vitalStatContent}>
-                <Text style={styles.vitalValue}>{patient.height}</Text>
-                <Text style={styles.vitalLabel}>
-                  <FontAwesome5 name="ruler-vertical" size={12} color="#757575" /> Height
-                </Text>
-              </View>
-            </TouchableRipple>
-          </Surface>
-          
-          <Surface style={styles.vitalStat} elevation={1}>
-            <TouchableRipple
-              rippleColor="rgba(0, 0, 0, 0.1)"
-              style={{borderRadius: 12}}
-              onPress={() => {}}
-            >
-              <View style={styles.vitalStatContent}>
-                <Text style={styles.vitalValue}>{patient.weight}</Text>
-                <Text style={styles.vitalLabel}>
-                  <FontAwesome5 name="weight" size={12} color="#757575" /> Weight
-                </Text>
-              </View>
-            </TouchableRipple>
-          </Surface>
-          
-          <Surface style={styles.vitalStat} elevation={1}>
-            <TouchableRipple
-              rippleColor="rgba(0, 0, 0, 0.1)"
-              style={{borderRadius: 12}}
-              onPress={() => {}}
-            >
-              <View style={styles.vitalStatContent}>
-                <Text style={styles.vitalValue}>{patient.bloodPressure}</Text>
-                <Text style={styles.vitalLabel}>
-                  <FontAwesome5 name="heartbeat" size={12} color="#757575" /> BP
-                </Text>
-              </View>
-            </TouchableRipple>
-          </Surface>
-        </View>
-        
-        {/* Patient Details */}
+        {/* Contact Information Card */}
         <Surface style={styles.detailsCard} elevation={1}>
-          <TouchableRipple
-            rippleColor="rgba(0, 0, 0, 0.1)"
-            style={{borderRadius: 12}}
-            onPress={() => {}}
-          >
-            <View>
-              <View style={styles.sectionHeader}>
-                <ThemedText style={styles.sectionTitle}>Contact Information</ThemedText>
-              </View>
-              <Divider style={styles.divider} />
-              
-              <View style={styles.detailItem}>
-                <FontAwesome5 name="phone" size={14} color="#757575" style={styles.detailIcon} />
-                <View>
-                  <Text style={styles.detailLabel}>Phone</Text>
-                  <Text style={styles.detailValue}>{patient.phone}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.detailIcon} />
-                <View>
-                  <Text style={styles.detailLabel}>Email</Text>
-                  <Text style={styles.detailValue}>{patient.email}</Text>
-                </View>
-              </View>
+          <View>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Contact Information</ThemedText>
             </View>
-          </TouchableRipple>
+            <Divider style={styles.divider} />
+            
+            <View style={styles.detailItem}>
+              <FontAwesome5 name="phone" size={14} color="#757575" style={styles.detailIcon} />
+              <View style={styles.contactDetail}>
+                <Text style={styles.detailLabel}>Phone</Text>
+                <Text style={styles.detailValue}>{patient.phone}</Text>
+              </View>
+              <Button 
+                icon="phone" 
+                mode="text" 
+                compact 
+                style={styles.actionButton}
+                labelStyle={styles.actionButtonLabel}
+                onPress={() => {}}
+              >
+                Call
+              </Button>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.detailIcon} />
+              <View style={styles.contactDetail}>
+                <Text style={styles.detailLabel}>Email</Text>
+                <Text style={styles.detailValue}>{patient.email}</Text>
+              </View>
+              <Button 
+                icon="message-text-outline" 
+                mode="text" 
+                compact 
+                style={styles.actionButton}
+                labelStyle={styles.actionButtonLabel}
+                onPress={() => {}}
+              >
+                Message
+              </Button>
+            </View>
+          </View>
         </Surface>
         
-        {/* Medical History */}
+        {/* Health Information Card */}
         <Surface style={styles.detailsCard} elevation={1}>
-          <TouchableRipple
-            rippleColor="rgba(0, 0, 0, 0.1)"
-            style={{borderRadius: 12}}
-            onPress={() => {}}
-          >
-            <View>
-          <View style={styles.sectionHeader}>
-                <ThemedText style={styles.sectionTitle}>Medical History</ThemedText>
+          <View>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Health Information</ThemedText>
+            </View>
+            <Divider style={styles.divider} />
+            
+            <View style={styles.vitalStatsContainer}>
+              <View style={styles.vitalItem}>
+                <FontAwesome5 name="ruler-vertical" size={14} color="#757575" style={styles.vitalIcon} />
+                <View>
+                  <Text style={styles.vitalLabel}>Height</Text>
+                  <Text style={styles.vitalValue}>{patient.height || 'Not recorded'}</Text>
+                </View>
               </View>
-              <Divider style={styles.divider} />
               
-              <View style={styles.medicalHistoryBox}>
-                <ThemedText style={styles.medicalHistoryText}>
-                  {patient.medicalHistory || "No medical history recorded"}
-            </ThemedText>
+              <View style={styles.vitalItem}>
+                <FontAwesome5 name="weight" size={14} color="#757575" style={styles.vitalIcon} />
+                <View>
+                  <Text style={styles.vitalLabel}>Weight</Text>
+                  <Text style={styles.vitalValue}>{patient.weight || 'Not recorded'}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.vitalItem}>
+                <FontAwesome5 name="heartbeat" size={14} color="#757575" style={styles.vitalIcon} />
+                <View>
+                  <Text style={styles.vitalLabel}>Blood Pressure</Text>
+                  <Text style={styles.vitalValue}>{patient.bloodPressure || 'Not recorded'}</Text>
+                </View>
               </View>
             </View>
-          </TouchableRipple>
+            
+            <Divider style={styles.sectionDivider} />
+            
+            <View style={styles.medicalHistorySection}>
+              <Text style={styles.medicalHistoryLabel}>Medical History</Text>
+              <Text style={styles.medicalHistoryText}>
+                {patient.medicalHistory || "No medical history recorded"}
+              </Text>
+            </View>
+          </View>
         </Surface>
         
         {/* Appointments Section */}
@@ -686,40 +655,6 @@ const styles = StyleSheet.create({
     color: '#BDBDBD',
     marginHorizontal: 8,
   },
-  contactRow: {
-    flexDirection: 'row',
-  },
-  contactButton: {
-    marginRight: 8,
-    paddingHorizontal: 0,
-  },
-  contactButtonLabel: {
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  vitalStatsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  vitalStat: {
-    flex: 1,
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginHorizontal: 4,
-    backgroundColor: '#FFFFFF',
-  },
-  vitalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 4,
-  },
-  vitalLabel: {
-    fontSize: 12,
-    color: '#757575',
-  },
   detailsCard: {
     marginTop: 16,
     borderRadius: 12,
@@ -761,8 +696,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#212121',
   },
-  medicalHistoryBox: {
+  vitalStatsContainer: {
     padding: 16,
+  },
+  vitalItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  vitalIcon: {
+    marginRight: 16,
+    width: 20,
+    textAlign: 'center',
+  },
+  vitalLabel: {
+    fontSize: 12,
+    color: '#757575',
+    marginBottom: 2,
+  },
+  vitalValue: {
+    fontSize: 15,
+    color: '#212121',
+  },
+  contactDetail: {
+    flex: 1,
+  },
+  actionButton: {
+    marginHorizontal: 0,
+  },
+  actionButtonLabel: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  sectionDivider: {
+    backgroundColor: '#EEEEEE',
+    height: 1,
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  medicalHistorySection: {
+    padding: 16,
+  },
+  medicalHistoryLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#212121',
+    marginBottom: 8,
   },
   medicalHistoryText: {
     fontSize: 15,
@@ -888,10 +867,6 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
     borderRadius: 20,
   },
-  sectionDivider: {
-    backgroundColor: '#EEEEEE',
-    height: 8,
-  },
   viewAllButton: {
     alignSelf: 'center',
     marginTop: 8,
@@ -937,12 +912,6 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     textAlign: 'center',
     marginTop: 4,
-  },
-  vitalStatContent: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
   },
   dateIndicator: {
     width: 50,
