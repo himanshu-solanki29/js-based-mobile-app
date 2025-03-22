@@ -867,7 +867,7 @@ export default function AppointmentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 50 : 30, // Add safe area top padding for iOS and Android
+    paddingTop: Platform.OS === 'ios' ? 65 : 45, // Add safe area top padding for iOS and Android
     backgroundColor: '#f8f9fa', // Light background for the whole screen
   },
   header: {

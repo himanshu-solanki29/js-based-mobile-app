@@ -320,7 +320,7 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingTop: Platform.OS === 'ios' ? 65 : 45,
     backgroundColor: '#f8f9fa',
   },
   header: {
