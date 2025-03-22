@@ -80,33 +80,39 @@ export default function AppointmentsScreen() {
   const params = useLocalSearchParams();
   const theme = useTheme();
   const { showToast } = useGlobalToast();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{start: string | null, end: string | null}>({start: null, end: null});
-  const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | 'all'>('confirmed');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<'single' | 'range'>('single');
-  const [isSchedulerVisible, setSchedulerVisible] = useState(false);
   const [dateTarget, setDateTarget] = useState<'single' | 'start' | 'end'>('single');
-  
-  // For completion dialog
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{start: string | null, end: string | null}>({
+    start: null,
+    end: null
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSchedulerVisible, setSchedulerVisible] = useState(false);
   const [completionDialogVisible, setCompletionDialogVisible] = useState(false);
   const [completionRemarks, setCompletionRemarks] = useState('');
-  const [appointmentToComplete, setAppointmentToComplete] = useState<Appointment | null>(null);
-  
-  // For menu
-  const [menuVisible, setMenuVisible] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Get patient info from URL params (if navigating from patient screen)
-  const patientId = params.patientId as string | undefined;
-  
-  // Automatically open scheduler when navigating from patient screen
+  // Setup event listeners
   useEffect(() => {
-    if (patientId) {
-      setSchedulerVisible(true);
-    }
-  }, [patientId]);
+    // Listen for data changes
+    const handleDataChange = () => {
+      console.log('AppointmentsScreen: Refreshing after data change');
+      // Force a refresh by incrementing the refresh trigger
+      setRefreshTrigger(prev => prev + 1);
+    };
+    
+    // Add event listener
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
+    
+    // Remove event listener on cleanup
+    return () => {
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
+    };
+  }, []);
   
   // Sort helper function
   const sortAppointmentsByDateDesc = (appointments: Appointment[]) => {
@@ -142,42 +148,6 @@ export default function AppointmentsScreen() {
       return dateB.getTime() - dateA.getTime();
     });
   };
-  
-  // Initialize with sorted appointments (filter out demo data)
-  const [displayedAppointments, setDisplayedAppointments] = useState<Appointment[]>([]);
-  
-  useEffect(() => {
-    // Initialize with sorted appointments (filter out demo data)
-    if (!loading && !error) {
-      const sorted = sortAppointmentsByDateDesc(appointments);
-      setDisplayedAppointments(sorted);
-    }
-  }, [appointments, loading, error]);
-  
-  // Always filter out demo data - these are the initial seed appointments
-  const filteredDisplayedAppointments = useMemo(() => {
-    return displayedAppointments.filter(appt => parseInt(appt.id) > 7);
-  }, [displayedAppointments]);
-  
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
-  // Setup event listeners
-  useEffect(() => {
-    // Listen for data changes
-    const handleDataChange = () => {
-      console.log('AppointmentsScreen: Refreshing after data change');
-      // Force a refresh by incrementing the refresh trigger
-      setRefreshTrigger(prev => prev + 1);
-    };
-    
-    // Add event listener
-    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
-    
-    // Remove event listener on cleanup
-    return () => {
-      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
-    };
-  }, []);
   
   // Filter appointments based on search query, selected date/range, and status
   const filteredAppointmentsMemo = useMemo(() => {
@@ -762,7 +732,7 @@ export default function AppointmentsScreen() {
       </View>
 
       <FlatList
-        data={filteredDisplayedAppointments}
+        data={filteredAppointmentsMemo}
         renderItem={renderAppointmentItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
@@ -818,17 +788,17 @@ export default function AppointmentsScreen() {
             </Button>
             <Button 
               onPress={async () => {
-                if (appointmentToComplete) {
+                if (selectedAppointment) {
                   try {
                     // Update the appointment status and patient history
                     await updateAppointmentStatus(
-                      appointmentToComplete.id, 
+                      selectedAppointment.id, 
                       'completed', 
                       completionRemarks.trim()
                     );
                     
                     // Update the filtered list
-                    setDisplayedAppointments([...displayedAppointments]);
+                    setRefreshTrigger(prev => prev + 1);
                     
                     // Close dialog
                     setCompletionDialogVisible(false);
@@ -856,7 +826,7 @@ export default function AppointmentsScreen() {
         isVisible={isSchedulerVisible}
         onClose={() => setSchedulerVisible(false)}
         onSchedule={handleScheduleAppointment}
-        patientId={patientId as string}
+        patientId={params.patientId as string}
       />
       
       <FAB
