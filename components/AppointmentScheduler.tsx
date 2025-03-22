@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { StyleSheet, View, ScrollView, Dimensions, FlatList } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Calendar } from 'react-native-calendars';
@@ -82,11 +82,16 @@ export function AppointmentScheduler({
   const [tempMinute, setTempMinute] = useState(0);
   const [tempAmPm, setTempAmPm] = useState('AM');
   
+  // Filter to only show user-created patients
+  const userCreatedPatients = useMemo(() => {
+    return patients.filter(patient => patient.userCreated === true);
+  }, [patients]);
+  
   // Initialize patients list on mount
   useEffect(() => {
-    // Use all patients without filtering
-    setFilteredPatients(patients);
-  }, [patients]);
+    // Use only user-created patients
+    setFilteredPatients(userCreatedPatients);
+  }, [userCreatedPatients]);
 
   // Find patient by ID effect
   useEffect(() => {
@@ -159,16 +164,16 @@ export function AppointmentScheduler({
   // Filter patients based on search query
   useEffect(() => {
     if (patientSearch.trim() === '') {
-      setFilteredPatients(patients);
+      setFilteredPatients(userCreatedPatients);
     } else {
       const query = patientSearch.toLowerCase();
-      const filtered = patients.filter(patient => 
+      const filtered = userCreatedPatients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [patientSearch, patients]);
+  }, [patientSearch, userCreatedPatients]);
 
   // Initialize temporary values when opening time picker
   useEffect(() => {

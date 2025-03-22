@@ -92,7 +92,7 @@ class PatientStorageService extends StorageService<PatientsData> {
   }
   
   // Add a new patient
-  async addPatient(patientData: PatientFormData): Promise<Patient> {
+  async addPatient(patientData: PatientFormData & { userCreated?: boolean }): Promise<Patient> {
     await this.ensureInitialized();
     
     // Create a unique ID for the new patient
@@ -111,7 +111,8 @@ class PatientStorageService extends StorageService<PatientsData> {
       bloodPressure: patientData.bloodPressure || '',
       medicalHistory: patientData.medicalHistory || '',
       visits: [],
-      lastVisit: ''
+      lastVisit: '',
+      userCreated: patientData.userCreated || false // Set userCreated flag based on input or default to false
     };
     
     // Add the patient to our database

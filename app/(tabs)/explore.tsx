@@ -42,24 +42,29 @@ export default function ExploreScreen() {
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
   
-  // Initialize filtered patients on component mount and when patients change
-  useEffect(() => {
-    setFilteredPatients(patients);
+  // Filter to only show user-created patients
+  const userCreatedPatients = useMemo(() => {
+    return patients.filter(patient => patient.userCreated === true);
   }, [patients]);
+
+  // Initialize filtered patients on component mount and when user-created patients change
+  useEffect(() => {
+    setFilteredPatients(userCreatedPatients);
+  }, [userCreatedPatients]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(patients);
+      setFilteredPatients(userCreatedPatients);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = patients.filter(patient => 
+      const filtered = userCreatedPatients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, patients]);
+  }, [searchQuery, userCreatedPatients]);
 
   const handleScheduleAppointment = async (appointmentData: {
     date: Date;
@@ -130,7 +135,7 @@ export default function ExploreScreen() {
     // Close the dialog and refresh patients list
     setPatientFormVisible(false);
     // Re-fetch patients
-    setFilteredPatients(patients);
+    setFilteredPatients(userCreatedPatients);
   };
 
   const renderPatientItem = ({ item }: { item: Patient }) => (

@@ -18,15 +18,16 @@ export type Patient = {
   id: string;
   name: string;
   age: number;
-  gender: string;
+  gender: 'male' | 'female' | 'other';
   phone: string;
   email: string;
-  height: string;
-  weight: string;
-  bloodPressure: string;
-  medicalHistory: string;
+  height?: string;
+  weight?: string;
+  bloodPressure?: string;
+  medicalHistory?: string;
   visits: Visit[];
-  lastVisit?: string;
+  lastVisit: string;
+  userCreated?: boolean; // Flag to indicate if patient was created by the user
 };
 
 export type PatientFormData = Omit<Patient, 'id' | 'visits' | 'lastVisit'>;
@@ -42,7 +43,10 @@ export const getPatientsArray = async (): Promise<Patient[]> => {
 
 // Add new patient
 export const addPatient = async (patientData: PatientFormData): Promise<Patient> => {
-  return await patientStorageService.addPatient(patientData);
+  return await patientStorageService.addPatient({
+    ...patientData,
+    userCreated: true
+  });
 };
 
 // Get patient by ID
