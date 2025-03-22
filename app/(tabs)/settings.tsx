@@ -14,6 +14,7 @@ import patientStorageService from '@/utils/patientStorageService';
 import appointmentStorageService from '@/utils/appointmentStorageService';
 import { initializeStorage } from '@/utils/initializeStorage';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
+import type { ToastType } from '@/components/Toast';
 
 // Helper function to convert JSON to CSV string
 const jsonToCSV = (jsonData) => {
@@ -393,6 +394,31 @@ export default function SettingsScreen() {
     }
   };
   
+  // Helper functions for validation during import
+  const isValidPatient = (patient) => {
+    if (!patient || typeof patient !== 'object') return false;
+    if (!patient.id || !patient.name) return false;
+    
+    // Basic validation of required fields
+    return (
+      typeof patient.id === 'string' && 
+      typeof patient.name === 'string' && 
+      patient.name.trim() !== ''
+    );
+  };
+  
+  const isValidAppointment = (appointment) => {
+    if (!appointment || typeof appointment !== 'object') return false;
+    if (!appointment.id || !appointment.patientId) return false;
+    
+    // Basic validation of required fields
+    return (
+      typeof appointment.id === 'string' && 
+      typeof appointment.patientId === 'string' && 
+      appointment.status !== undefined
+    );
+  };
+
   const processImportFile = async (file) => {
     try {
       const fileName = file.name || file.uri.split('/').pop();
@@ -413,6 +439,22 @@ export default function SettingsScreen() {
       }
       
       console.log('File content length:', fileContent.length);
+      
+      // Initialize import statistics
+      const stats = {
+        patients: {
+          total: 0,
+          success: 0,
+          duplicates: 0,
+          invalid: 0
+        },
+        appointments: {
+          total: 0,
+          success: 0,
+          duplicates: 0,
+          invalid: 0
+        }
+      };
       
       // Determine if it's JSON or CSV
       let importedData;
@@ -447,73 +489,130 @@ export default function SettingsScreen() {
       
       // Import patients if available
       if (importedData.patients && Array.isArray(importedData.patients) && importedData.patients.length > 0) {
+        stats.patients.total = importedData.patients.length;
+        console.log(`Found ${stats.patients.total} patients in import file`);
+        
         const existingPatients = await patientStorageService.getPatients();
         const existingPatientIds = new Set(existingPatients.map(p => p.id));
         
         const newPatients = {};
-        let duplicateCount = 0;
-        let addedCount = 0;
         
         for (const patient of importedData.patients) {
-          if (!patient || !patient.id) {
-            console.warn('Skipping invalid patient record');
+          if (!isValidPatient(patient)) {
+            stats.patients.invalid++;
+            console.warn('Skipping invalid patient record:', patient);
             continue;
           }
           
           if (existingPatientIds.has(patient.id)) {
-            duplicateCount++;
+            stats.patients.duplicates++;
             continue;
           }
           
           newPatients[patient.id] = patient;
-          addedCount++;
+          stats.patients.success++;
         }
         
-        if (addedCount > 0) {
+        if (stats.patients.success > 0) {
           await patientStorageService.bulkAddPatients(newPatients);
-          showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
-        } else if (duplicateCount > 0) {
-          showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
-        } else {
-          showToast('No valid patients found in file', 'info');
         }
       }
       
       // Import appointments if available
       if (importedData.appointments && Array.isArray(importedData.appointments) && importedData.appointments.length > 0) {
+        stats.appointments.total = importedData.appointments.length;
+        console.log(`Found ${stats.appointments.total} appointments in import file`);
+        
         const existingAppointments = await appointmentStorageService.getAppointments();
         const existingIds = new Set(existingAppointments.map(app => app.id));
         
         const newAppointments = [];
-        let duplicateCount = 0;
-        let addedCount = 0;
         
         for (const appointment of importedData.appointments) {
-          if (!appointment || !appointment.id) {
-            console.warn('Skipping invalid appointment record');
+          if (!isValidAppointment(appointment)) {
+            stats.appointments.invalid++;
+            console.warn('Skipping invalid appointment record:', appointment);
             continue;
           }
           
           if (existingIds.has(appointment.id)) {
-            duplicateCount++;
+            stats.appointments.duplicates++;
             continue;
           }
           
           newAppointments.push(appointment);
-          addedCount++;
+          stats.appointments.success++;
         }
         
-        if (addedCount > 0) {
+        if (stats.appointments.success > 0) {
           await appointmentStorageService.bulkAddAppointments(newAppointments);
-          showToast(`Imported ${addedCount} appointments (${duplicateCount} duplicates skipped)`, 'success');
-        } else if (duplicateCount > 0) {
-          showToast(`No new appointments added. ${duplicateCount} duplicates skipped.`, 'info');
-        } else {
-          showToast('No valid appointments found in file', 'info');
         }
       }
       
-      showToast('Import complete', 'success');
+      // Display import results in a user-friendly format
+      const formatImportResults = () => {
+        // Build detailed import summary
+        const totalRecords = stats.patients.total + stats.appointments.total;
+        const totalImported = stats.patients.success + stats.appointments.success;
+        const totalDuplicates = stats.patients.duplicates + stats.appointments.duplicates;
+        const totalInvalid = stats.patients.invalid + stats.appointments.invalid;
+        
+        console.log('Import stats:', stats);
+        
+        // Prepare summary message
+        let summaryMessage = '';
+        let toastType: ToastType = 'info';
+        
+        if (totalImported > 0) {
+          summaryMessage = `Successfully imported ${totalImported} of ${totalRecords} records`;
+          toastType = 'success';
+          
+          const detailParts = [];
+          if (stats.patients.success > 0) {
+            detailParts.push(`${stats.patients.success} patients`);
+          }
+          if (stats.appointments.success > 0) {
+            detailParts.push(`${stats.appointments.success} appointments`);
+          }
+          
+          if (detailParts.length > 0) {
+            summaryMessage += ` (${detailParts.join(', ')})`;
+          }
+          
+          // Add skipped/invalid counts if any
+          if (totalDuplicates > 0 || totalInvalid > 0) {
+            const skipParts = [];
+            if (totalDuplicates > 0) {
+              skipParts.push(`${totalDuplicates} duplicates`);
+            }
+            if (totalInvalid > 0) {
+              skipParts.push(`${totalInvalid} invalid`);
+            }
+            
+            if (skipParts.length > 0) {
+              summaryMessage += `. Skipped ${skipParts.join(', ')}.`;
+            }
+          }
+        } else if (totalDuplicates > 0 && totalInvalid === 0) {
+          summaryMessage = `All ${totalDuplicates} records were duplicates. Nothing new imported.`;
+        } else if (totalInvalid > 0 && totalDuplicates === 0) {
+          summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported.`;
+          toastType = 'error';
+        } else if (totalDuplicates > 0 && totalInvalid > 0) {
+          summaryMessage = `No new data imported. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
+          toastType = 'warning';
+        } else {
+          summaryMessage = 'No valid data found to import';
+          toastType = 'warning';
+        }
+        
+        return { message: summaryMessage, type: toastType };
+      };
+      
+      // Show results to user
+      const results = formatImportResults();
+      showToast(results.message, results.type);
+      
     } catch (error) {
       console.error('Error processing import file:', error);
       showToast('Failed to process import file: ' + (error.message || 'Unknown error'), 'error');
@@ -527,6 +626,22 @@ export default function SettingsScreen() {
     try {
       let patientsFile = null;
       let appointmentsFile = null;
+      
+      // Initialize import statistics
+      const stats = {
+        patients: {
+          total: 0,
+          success: 0,
+          duplicates: 0,
+          invalid: 0
+        },
+        appointments: {
+          total: 0,
+          success: 0,
+          duplicates: 0,
+          invalid: 0
+        }
+      };
       
       // Identify which file is which
       for (const file of files) {
@@ -559,6 +674,7 @@ export default function SettingsScreen() {
         
         // Parse CSV to JSON
         const importedPatients = csvToJSON(patientsContent);
+        stats.patients.total = importedPatients.length;
         console.log('Imported patients count:', importedPatients.length);
         
         if (importedPatients.length === 0) {
@@ -572,37 +688,31 @@ export default function SettingsScreen() {
           const existingPatientIds = new Set(existingPatients.map(p => p.id));
           
           const newPatients = {};
-          let duplicateCount = 0;
-          let addedCount = 0;
           
           for (const patient of importedPatients) {
             // Validate patient data
-            if (!patient || !patient.id) {
+            if (!isValidPatient(patient)) {
+              stats.patients.invalid++;
               console.warn('Skipping invalid patient record:', patient);
               continue;
             }
             
             // Check if patient with same ID already exists
             if (existingPatientIds.has(patient.id)) {
-              duplicateCount++;
+              stats.patients.duplicates++;
               continue; // Skip duplicate
             }
             
             // Add to new patients object
             newPatients[patient.id] = patient;
-            addedCount++;
+            stats.patients.success++;
           }
           
-          console.log(`Patient import results: ${addedCount} new, ${duplicateCount} duplicates`);
+          console.log(`Patient import results: ${stats.patients.success} new, ${stats.patients.duplicates} duplicates, ${stats.patients.invalid} invalid`);
           
           // Add new patients to storage
-          if (addedCount > 0) {
+          if (stats.patients.success > 0) {
             await patientStorageService.bulkAddPatients(newPatients);
-            showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
-          } else if (duplicateCount > 0) {
-            showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
-          } else {
-            showToast('No valid patients found in file', 'info');
           }
         }
       }
@@ -625,41 +735,108 @@ export default function SettingsScreen() {
         
         // Parse CSV to JSON
         const importedAppointments = csvToJSON(appointmentsContent);
+        stats.appointments.total = importedAppointments.length;
         
         // Get existing appointments and check for duplicates
         const existingAppointments = await appointmentStorageService.getAppointments();
         const existingIds = new Set(existingAppointments.map(app => app.id));
         
         const newAppointments = [];
-        let duplicateCount = 0;
-        let addedCount = 0;
         
         for (const appointment of importedAppointments) {
+          // Validate appointment
+          if (!isValidAppointment(appointment)) {
+            stats.appointments.invalid++;
+            console.warn('Skipping invalid appointment record:', appointment);
+            continue;
+          }
+          
           // Check if appointment with same ID already exists
           if (existingIds.has(appointment.id)) {
-            duplicateCount++;
+            stats.appointments.duplicates++;
             continue; // Skip duplicate
           }
           
           // Add to new appointments array
           newAppointments.push(appointment);
-          addedCount++;
+          stats.appointments.success++;
         }
         
+        console.log(`Appointment import results: ${stats.appointments.success} new, ${stats.appointments.duplicates} duplicates, ${stats.appointments.invalid} invalid`);
+        
         // Add new appointments to storage
-        if (addedCount > 0) {
+        if (stats.appointments.success > 0) {
           await appointmentStorageService.bulkAddAppointments(newAppointments);
-          showToast(`Imported ${addedCount} appointments (${duplicateCount} duplicates skipped)`, 'success');
-        } else if (duplicateCount > 0) {
-          showToast(`No new appointments added. ${duplicateCount} duplicates skipped.`, 'info');
-        } else {
-          showToast('No appointments data found in file', 'info');
         }
       }
       
-      if (!patientsFile && !appointmentsFile) {
-        showToast('No valid data files found', 'warning');
-      }
+      // Display import results in a user-friendly format
+      const formatImportResults = () => {
+        // Build detailed import summary
+        const totalRecords = stats.patients.total + stats.appointments.total;
+        const totalImported = stats.patients.success + stats.appointments.success;
+        const totalDuplicates = stats.patients.duplicates + stats.appointments.duplicates;
+        const totalInvalid = stats.patients.invalid + stats.appointments.invalid;
+        
+        console.log('Import stats:', stats);
+        
+        // Prepare summary message
+        let summaryMessage = '';
+        let toastType: ToastType = 'info';
+        
+        if (totalImported > 0) {
+          summaryMessage = `Successfully imported ${totalImported} of ${totalRecords} records`;
+          toastType = 'success';
+          
+          const detailParts = [];
+          if (stats.patients.success > 0) {
+            detailParts.push(`${stats.patients.success} patients`);
+          }
+          if (stats.appointments.success > 0) {
+            detailParts.push(`${stats.appointments.success} appointments`);
+          }
+          
+          if (detailParts.length > 0) {
+            summaryMessage += ` (${detailParts.join(', ')})`;
+          }
+          
+          // Add skipped/invalid counts if any
+          if (totalDuplicates > 0 || totalInvalid > 0) {
+            const skipParts = [];
+            if (totalDuplicates > 0) {
+              skipParts.push(`${totalDuplicates} duplicates`);
+            }
+            if (totalInvalid > 0) {
+              skipParts.push(`${totalInvalid} invalid`);
+            }
+            
+            if (skipParts.length > 0) {
+              summaryMessage += `. Skipped ${skipParts.join(', ')}.`;
+            }
+          }
+        } else if (totalDuplicates > 0 && totalInvalid === 0) {
+          summaryMessage = `All ${totalDuplicates} records were duplicates. Nothing new imported.`;
+        } else if (totalInvalid > 0 && totalDuplicates === 0) {
+          summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported.`;
+          toastType = 'error';
+        } else if (totalDuplicates > 0 && totalInvalid > 0) {
+          summaryMessage = `No new data imported. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
+          toastType = 'warning';
+        } else if (!patientsFile && !appointmentsFile) {
+          summaryMessage = 'No valid data files found';
+          toastType = 'warning';
+        } else {
+          summaryMessage = 'No valid data found to import';
+          toastType = 'warning';
+        }
+        
+        return { message: summaryMessage, type: toastType };
+      };
+      
+      // Show results to user
+      const results = formatImportResults();
+      showToast(results.message, results.type);
+      
     } catch (error) {
       console.error('Error processing import CSV files:', error);
       showToast('Failed to process CSV files: ' + (error.message || 'Unknown error'), 'error');
