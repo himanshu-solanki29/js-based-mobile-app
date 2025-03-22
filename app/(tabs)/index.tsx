@@ -13,7 +13,7 @@ import {
 } from "../../utils/appointmentStore";
 import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput, TouchableRipple } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
-import { Appointment } from '../../utils/appointmentStore';
+import { Appointment, AppointmentStatus } from '../../utils/appointmentStore';
 import { useGlobalToast } from "@/components/GlobalToastProvider";
 import { INITIAL_PATIENTS } from '@/utils/initialData';
 import { INITIAL_APPOINTMENTS } from '@/utils/initialData';
@@ -21,6 +21,30 @@ import { EventEmitter } from 'events';
 
 // Create a global event emitter for app-wide events
 export const globalEventEmitter = new EventEmitter();
+
+// Define status color constants at the top of the file
+const STATUS_COLORS = {
+  confirmed: {
+    bg: '#E8F5E9',
+    text: '#2E7D32',
+    accent: '#4CAF50'
+  },
+  pending: {
+    bg: '#FFF8E1',
+    text: '#F57F17',
+    accent: '#FFC107'
+  },
+  cancelled: {
+    bg: '#FFEBEE',
+    text: '#C62828',
+    accent: '#F44336'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#1565C0',
+    accent: '#2196F3'
+  }
+};
 
 // Function to get upcoming appointments is removed - we use the useAppointments hook
 
@@ -274,21 +298,8 @@ export default function HomeScreen() {
   };
   
   const AppointmentItem = ({ item }: { item: Appointment }) => {
-    const statusTextColors = {
-      confirmed: '#2E7D32',
-      pending: '#E65100',
-      cancelled: '#C62828',
-      completed: '#00695C',
-    };
-
-    const statusBgColors = {
-      confirmed: '#E8F5E9',
-      pending: '#FFF3E0',
-      cancelled: '#FFEBEE',
-      completed: '#E0F2F1',
-    };
-
-    const formattedDate = formatDate(item.date);
+    // Get status colors based on the STATUS_COLORS object from appointments.tsx
+    const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.confirmed;
     
     // Function to handle quick status update
     const handleQuickStatusUpdate = (event: any) => {
@@ -314,38 +325,60 @@ export default function HomeScreen() {
       }
     };
     
+    // Render status badge similar to the appointments screen
+    const renderStatusBadge = (status: AppointmentStatus) => {
+      return (
+        <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+          <ThemedText style={[styles.statusText, { color: statusColors.text }]}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </ThemedText>
+        </View>
+      );
+    };
+    
     return (
       <TouchableRipple
         style={styles.appointmentItem}
         onPress={() => router.push(`/appointment/${item.id}`)}
-        rippleColor="rgba(0, 0, 0, 0.1)"
+        rippleColor="rgba(0, 0, 0, 0.08)"
       >
-        <View>
-          <View style={styles.appointmentHeader}>
-            <ThemedText style={styles.appointmentPatient}>{item.patientName}</ThemedText>
-            <TouchableRipple
-              onPress={handleQuickStatusUpdate}
-              rippleColor="rgba(0, 0, 0, 0.1)"
-              style={{ borderRadius: 10 }}
-            >
-              <View 
-                style={[
-                  styles.statusBadge, 
-                  { backgroundColor: statusBgColors[item.status] }
-                ]}
-              >
-                <ThemedText style={[styles.statusText, { color: statusTextColors[item.status] }]}>
-                  {item.status}
-                </ThemedText>
-              </View>
-            </TouchableRipple>
+        <View style={styles.appointmentItemContent}>
+          <View style={[
+            styles.dateBox, 
+            { backgroundColor: statusColors.bg }
+          ]}>
+            <ThemedText style={[
+              styles.dateDay,
+              { color: statusColors.text }
+            ]}>
+              {new Date(item.date).getDate()}
+            </ThemedText>
+            <ThemedText style={[
+              styles.dateMonth,
+              { color: statusColors.text }
+            ]}>
+              {new Date(item.date).toLocaleString('default', { month: 'short' })}
+            </ThemedText>
           </View>
-          <ThemedText style={styles.appointmentTime}>
-            <FontAwesome5 name="calendar-alt" size={12} /> {formattedDate}, {item.time}
-          </ThemedText>
-          <ThemedText style={styles.appointmentReason} numberOfLines={1} ellipsizeMode="tail">
-            {item.reason}
-          </ThemedText>
+          
+          <View style={styles.appointmentDetails}>
+            <View style={styles.appointmentHeaderInner}>
+              <ThemedText style={styles.patientName}>{item.patientName}</ThemedText>
+              <TouchableRipple
+                onPress={handleQuickStatusUpdate}
+                rippleColor="rgba(0, 0, 0, 0.1)"
+                style={{ borderRadius: 12 }}
+              >
+                {renderStatusBadge(item.status)}
+              </TouchableRipple>
+            </View>
+            <ThemedText style={styles.appointmentTime}>
+              <FontAwesome5 name="clock" size={12} color={statusColors.accent} /> {item.time}
+            </ThemedText>
+            <ThemedText style={styles.appointmentReason} numberOfLines={1} ellipsizeMode="tail">
+              {item.reason}
+            </ThemedText>
+          </View>
         </View>
       </TouchableRipple>
     );
@@ -871,29 +904,53 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   appointmentItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    padding: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  appointmentHeader: {
+  appointmentItemContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  dateBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    padding: 8,
+    width: 48,
+    height: 48,
+  },
+  dateDay: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dateMonth: {
+    fontSize: 12,
+  },
+  appointmentDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  appointmentHeaderInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
   },
-  appointmentPatient: {
+  patientName: {
     fontSize: 16,
     fontWeight: 'bold',
+    flex: 1,
+    marginRight: 8,
   },
   statusBadge: {
-    backgroundColor: '#E8F5E9',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   statusText: {
-    color: '#2E7D32',
     fontWeight: '600',
     fontSize: 12,
     textTransform: 'capitalize',
