@@ -1173,29 +1173,65 @@ export default function SettingsScreen() {
       
       {/* Export confirmation modal */}
       <Portal>
-        <Dialog visible={showExportModal} onDismiss={() => setShowExportModal(false)}>
-          <Dialog.Title>Export Data Before Clearing?</Dialog.Title>
+        <Dialog visible={showExportModal} onDismiss={() => setShowExportModal(false)} style={styles.dialog}>
+          <Dialog.Title style={styles.dialogTitle}>
+            <FontAwesome5 name="file-export" size={16} color="#4CAF50" style={{marginRight: 6}} />
+            Export Data Before Clearing
+          </Dialog.Title>
           <Dialog.Content>
-            <Paragraph>Would you like to export all your data before clearing it?</Paragraph>
+            <ThemedText style={styles.dialogText}>
+              Would you like to export all your data before clearing it? This ensures you have a backup of your information.
+            </ThemedText>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => handleExportChoice(true)}>Yes, Export First</Button>
-            <Button onPress={() => handleExportChoice(false)}>No, Continue</Button>
-            <Button onPress={() => setShowExportModal(false)}>Cancel</Button>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button onPress={() => setShowExportModal(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
+              Cancel
+            </Button>
+            <Button 
+              onPress={() => handleExportChoice(false)} 
+              textColor="#F44336"
+              labelStyle={{fontSize: 13}}
+            >
+              No, Skip Export
+            </Button>
+            <Button 
+              onPress={() => handleExportChoice(true)} 
+              mode="contained" 
+              buttonColor="#4CAF50"
+              style={{borderRadius: 8}}
+              labelStyle={{fontSize: 13}}
+            >
+              Yes, Export
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
       
       {/* Final clear confirmation modal */}
       <Portal>
-        <Dialog visible={showConfirmClearModal} onDismiss={() => setShowConfirmClearModal(false)}>
-          <Dialog.Title>Confirm Clear All Data</Dialog.Title>
+        <Dialog visible={showConfirmClearModal} onDismiss={() => setShowConfirmClearModal(false)} style={styles.dialog}>
+          <Dialog.Title style={styles.dialogTitle}>
+            <FontAwesome5 name="trash-alt" size={16} color="#F44336" style={{marginRight: 6}} />
+            Confirm Clear All Data
+          </Dialog.Title>
           <Dialog.Content>
-            <Paragraph>Are you sure you want to permanently delete all data? This action cannot be undone.</Paragraph>
+            <ThemedText style={styles.dialogText}>
+              Are you sure you want to permanently delete all data? This action cannot be undone.
+            </ThemedText>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowConfirmClearModal(false)}>Cancel</Button>
-            <Button mode="contained" buttonColor="#F44336" textColor="white" onPress={() => handleConfirmClear(true)}>Clear Everything</Button>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button onPress={() => setShowConfirmClearModal(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
+              Cancel
+            </Button>
+            <Button 
+              mode="contained"
+              buttonColor="#F44336" 
+              onPress={() => handleConfirmClear(true)}
+              style={{borderRadius: 8}}
+              labelStyle={{fontSize: 13}}
+            >
+              Yes, Clear Everything
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -1306,5 +1342,26 @@ const styles = StyleSheet.create({
   clearDataButton: {
     borderColor: '#F44336',
     borderRadius: 8,
+  },
+  dialog: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    elevation: 4,
+    padding: 4,
+  },
+  dialogTitle: {
+    fontWeight: 'bold',
+    color: '#333333',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  dialogText: {
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  dialogActions: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    paddingTop: 4,
   },
 }); 
