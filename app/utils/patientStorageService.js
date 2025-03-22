@@ -3,8 +3,6 @@ import { Platform } from 'react-native';
 import { requestStoragePermissions, checkStoragePermissions } from '../runtime-permissions';
 
 const PATIENT_STORAGE_KEY = 'patients';
-// List of dummy patient IDs (1-5) to avoid collisions
-const DUMMY_PATIENT_IDS = ['1', '2', '3', '4', '5'];
 
 // Helper function to log errors that might be happening during storage operations
 const logStorageError = (operation, error) => {

@@ -16,7 +16,6 @@ import { initializeStorage } from '@/utils/initializeStorage';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import type { ToastType } from '@/components/Toast';
 import StorageService from '@/utils/storageService';
-import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS } from '@/utils/initialData';
 import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
 
 // Log storage service
@@ -360,19 +359,14 @@ export default function SettingsScreen() {
       // Get all appointments
       const appointments = await appointmentStorageService.getAppointments();
       
-      // Always filter out dummy data
-      // Filter out dummy patients (IDs 1-5)
-      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-      const filteredPatients = patients.filter(patient => !initialPatientIds.includes(patient.id));
+      // Use all patients and appointments without filtering
+      const filteredPatients = patients;
+      const filteredAppointments = appointments;
       
-      // Filter out dummy appointments (IDs 1-7)
-      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-      const filteredAppointments = appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+      console.log(`Exporting ${filteredPatients.length} patients`);
+      console.log(`Exporting ${filteredAppointments.length} appointments`);
       
-      console.log(`Filtered out ${patients.length - filteredPatients.length} dummy patients`);
-      console.log(`Filtered out ${appointments.length - filteredAppointments.length} dummy appointments`);
-      
-      // Check if there's any data to export after filtering
+      // Check if there's any data to export
       if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
         showToast('No data to export', 'warning');
         

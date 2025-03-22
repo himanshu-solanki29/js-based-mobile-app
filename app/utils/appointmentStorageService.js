@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// List of dummy appointment IDs (1-7) to avoid collisions
-const DUMMY_APPOINTMENT_IDS = ['1', '2', '3', '4', '5', '6', '7'];
 const APPOINTMENTS_STORAGE_KEY = 'appointments';
 
 // Helper function to log errors that might be happening during storage operations

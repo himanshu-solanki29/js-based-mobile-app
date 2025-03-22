@@ -15,8 +15,6 @@ import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useT
 import { usePatients } from '@/utils/patientStore';
 import { Appointment, AppointmentStatus } from '../../utils/appointmentStore';
 import { useGlobalToast } from "@/components/GlobalToastProvider";
-import { INITIAL_PATIENTS } from '@/utils/initialData';
-import { INITIAL_APPOINTMENTS } from '@/utils/initialData';
 import { EventEmitter } from 'events';
 
 // Create a global event emitter for app-wide events
@@ -87,23 +85,17 @@ export default function HomeScreen() {
     };
   }, []);
   
-  // Filter data to only show user-created data
+  // Use all patients - no filtering of dummy data
   const filteredPatients = useMemo(() => {
-    // Always filter out dummy patients (IDs 1-5) to only show user-created data
-    const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-    return patientsArray.filter(patient => !initialPatientIds.includes(patient.id));
+    return patientsArray;
   }, [patientsArray]);
   
   const filteredAppointments = useMemo(() => {
-    // Always filter out dummy appointments (IDs 1-7) to only show user-created data 
-    const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-    return appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+    return appointments;
   }, [appointments]);
   
   const filteredUpcomingAppointments = useMemo(() => {
-    // Always filter out dummy appointments (IDs 1-7) to only show user-created data
-    const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-    return upcomingAppointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+    return upcomingAppointments;
   }, [upcomingAppointments]);
   
   // Limit upcoming appointments to maximum 6
