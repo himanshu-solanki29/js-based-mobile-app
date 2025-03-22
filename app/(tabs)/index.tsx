@@ -458,35 +458,18 @@ export default function HomeScreen() {
               {limitedUpcomingAppointments.length === 0 ? (
                 <View style={styles.emptyContent}>
                   <FontAwesome5 name="calendar-check" size={32} color="#CCCCCC" />
-                  <ThemedText style={styles.emptyText}>No user appointments found</ThemedText>
-                  <ThemedText style={styles.emptySubText}>
-                    This screen only shows your created data. 
-                    {'\n'}Create an appointment or enable dummy data in Settings.
-                  </ThemedText>
-                  <View style={styles.emptyButtonsRow}>
-                    <Button 
-                      mode="outlined" 
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push('/(tabs)/appointments');
-                      }}
-                      style={styles.emptyButton}
-                      textColor="#4CAF50"
-                    >
-                      Schedule Now
-                    </Button>
-                    <Button 
-                      mode="outlined" 
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push('/settings');
-                      }}
-                      style={styles.emptyButton}
-                      textColor="#2196F3"
-                    >
-                      Enable Demo Data
-                    </Button>
-                  </View>
+                  <ThemedText style={styles.emptyText}>No appointments found</ThemedText>
+                  <Button 
+                    mode="outlined" 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/(tabs)/appointments');
+                    }}
+                    style={styles.scheduleEmptyButton}
+                    textColor="#4CAF50"
+                  >
+                    Schedule
+                  </Button>
                 </View>
               ) : (
                 <ScrollView 
