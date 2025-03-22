@@ -321,9 +321,9 @@ export default function SettingsScreen() {
 
   const toggleSwitch = async (setting: string, value: boolean) => {
     try {
-      switch (setting) {
-        case 'darkMode':
-          setDarkMode(value);
+    switch (setting) {
+      case 'darkMode':
+        setDarkMode(value);
           if (Platform.OS === 'web' && typeof window !== 'undefined') {
             localStorage.setItem('@app_config_dark_mode', value ? 'true' : 'false');
           } else {
@@ -331,7 +331,7 @@ export default function SettingsScreen() {
           }
           // Show toast
           showToast(`Dark mode ${value ? 'enabled' : 'disabled'}`, 'success');
-          break;
+        break;
           
         case 'notifications':
           setNotifications(value);
@@ -342,7 +342,7 @@ export default function SettingsScreen() {
           }
           // Show toast
           showToast(`Notifications ${value ? 'enabled' : 'disabled'}`, 'success');
-          break;
+        break;
       }
     } catch (error) {
       console.error(`Error toggling ${setting}:`, error);
@@ -523,7 +523,7 @@ export default function SettingsScreen() {
           console.log('iOS export: saved file to:', filePath);
           
           // Check if sharing is available
-          if (await Sharing.isAvailableAsync()) {
+        if (await Sharing.isAvailableAsync()) {
             // Share the file
             await Sharing.shareAsync(filePath, {
               mimeType: 'application/json',
@@ -539,8 +539,8 @@ export default function SettingsScreen() {
               status: 'success',
               details: `${logDetails} (iOS share: ${filename})`
             });
-          } else {
-            Alert.alert('Error', 'Sharing is not available on this device');
+        } else {
+          Alert.alert('Error', 'Sharing is not available on this device');
             
             // Log sharing not available error
             await logStorageService.addLog({
@@ -1290,11 +1290,11 @@ export default function SettingsScreen() {
         });
         
         // In a production app, you might want to restart the app or navigate to a login screen
-        Alert.alert(
+    Alert.alert(
           'Data Cleared',
           'All data has been cleared successfully. Please restart the app for changes to take effect.',
-          [{ text: 'OK' }]
-        );
+      [{ text: 'OK' }]
+    );
       }
     } catch (error) {
       console.error('Failed to clear data:', error);
@@ -1449,7 +1449,7 @@ export default function SettingsScreen() {
         {/* Data Management */}
         <Surface style={styles.section} elevation={1}>
           <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
             <Menu
               visible={showLogMenu}
               onDismiss={() => setShowLogMenu(false)}
