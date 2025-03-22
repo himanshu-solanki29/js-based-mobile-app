@@ -604,65 +604,67 @@ export default function AppointmentDetailsScreen() {
         )}
       </ScrollView>
       
-      {/* Fixed Footer for Actions */}
-      <SafeAreaView style={styles.footerContainer}>
-        <View style={styles.footerContent}>
-          
-          {/* Only show pending actions if the appointment is pending */}
-          {appointment?.status === 'pending' && !actionInProgress && (
-            <View style={styles.buttonGroup}>
-              <Button 
-                mode="outlined"
-                icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
-                style={styles.cancelAppointmentButton}
-                textColor="#F44336"
-                onPress={() => openStatusChangeDialog('cancelled')}
-                disabled={actionInProgress}
-              >
-                Cancel
-              </Button>
-              <Button 
-                mode="contained"
-                icon={() => <FontAwesome5 name="check" size={16} color="#FFFFFF" />}
-                style={styles.confirmButton}
-                buttonColor="#4CAF50"
-                textColor="#FFFFFF"
-                onPress={() => openStatusChangeDialog('confirmed')}
-                disabled={actionInProgress}
-              >
-                Confirm
-              </Button>
-            </View>
-          )}
-          
-          {/* Only show completion action if the appointment is confirmed */}
-          {appointment?.status === 'confirmed' && !actionInProgress && (
-            <View style={styles.buttonGroup}>
-              <Button 
-                mode="outlined"
-                icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
-                style={styles.cancelAppointmentButton}
-                textColor="#F44336"
-                onPress={() => openStatusChangeDialog('cancelled')}
-                disabled={actionInProgress}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onPress={() => setCompleteDialogVisible(true)}
-                mode="contained" 
-                buttonColor="#4CAF50"
-                textColor="white"
-                style={styles.actionButton}
-                icon="check-circle"
-                disabled={appointment?.status !== 'confirmed' || actionInProgress}
-              >
-                Complete
-              </Button>
-            </View>
-          )}
-        </View>
-      </SafeAreaView>
+      {/* Fixed Footer for Actions - Only show for pending and confirmed appointments */}
+      {(appointment?.status === 'pending' || appointment?.status === 'confirmed') && !actionInProgress && (
+        <SafeAreaView style={styles.footerContainer}>
+          <View style={styles.footerContent}>
+            
+            {/* Only show pending actions if the appointment is pending */}
+            {appointment?.status === 'pending' && (
+              <View style={styles.buttonGroup}>
+                <Button 
+                  mode="outlined"
+                  icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
+                  style={styles.cancelAppointmentButton}
+                  textColor="#F44336"
+                  onPress={() => openStatusChangeDialog('cancelled')}
+                  disabled={actionInProgress}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  mode="contained"
+                  icon={() => <FontAwesome5 name="check" size={16} color="#FFFFFF" />}
+                  style={styles.confirmButton}
+                  buttonColor="#4CAF50"
+                  textColor="#FFFFFF"
+                  onPress={() => openStatusChangeDialog('confirmed')}
+                  disabled={actionInProgress}
+                >
+                  Confirm
+                </Button>
+              </View>
+            )}
+            
+            {/* Only show completion action if the appointment is confirmed */}
+            {appointment?.status === 'confirmed' && (
+              <View style={styles.buttonGroup}>
+                <Button 
+                  mode="outlined"
+                  icon={() => <FontAwesome5 name="times" size={16} color="#F44336" />}
+                  style={styles.cancelAppointmentButton}
+                  textColor="#F44336"
+                  onPress={() => openStatusChangeDialog('cancelled')}
+                  disabled={actionInProgress}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onPress={() => setCompleteDialogVisible(true)}
+                  mode="contained" 
+                  buttonColor="#4CAF50"
+                  textColor="white"
+                  style={styles.actionButton}
+                  icon="check-circle"
+                  disabled={appointment?.status !== 'confirmed' || actionInProgress}
+                >
+                  Complete
+                </Button>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      )}
       
       {/* Dialog for status change */}
       <Dialog visible={statusChangeDialogVisible} onDismiss={() => !actionInProgress && setStatusChangeDialogVisible(false)} style={styles.dialog}>
