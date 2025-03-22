@@ -1,7 +1,7 @@
 import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph, Menu, IconButton } from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import * as Sharing from 'expo-sharing';
@@ -19,6 +19,9 @@ import StorageService from '@/utils/storageService';
 
 // Log storage service
 const LOG_STORAGE_KEY = 'operation_logs';
+
+// Constants
+const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
 
 // Log entry type
 type LogEntry = {
@@ -287,6 +290,7 @@ export default function SettingsScreen() {
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
+  const [showDummyData, setShowDummyData] = useState(true);
   
   // Add state for menu and modals
   const [menuVisible, setMenuVisible] = useState(false);
@@ -295,6 +299,29 @@ export default function SettingsScreen() {
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+  // Load show dummy data setting on component mount
+  useEffect(() => {
+    const loadShowDummyDataSetting = async () => {
+      try {
+        let value;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          value = localStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        } else {
+          value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        }
+        
+        // Default to true if setting doesn't exist
+        setShowDummyData(value === null ? true : value === 'true');
+      } catch (error) {
+        console.error('Error loading show dummy data setting:', error);
+        // Default to true on error
+        setShowDummyData(true);
+      }
+    };
+    
+    loadShowDummyDataSetting();
+  }, []);
 
   const toggleSwitch = (setting: string, value: boolean) => {
     switch (setting) {
@@ -325,6 +352,35 @@ export default function SettingsScreen() {
         break;
       case 'autoBackup':
         setAutoBackup(value);
+        break;
+      case 'showDummyData':
+        setShowDummyData(value);
+        // Persist the setting
+        try {
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            localStorage.setItem(SHOW_DUMMY_DATA_KEY, value.toString());
+          } else {
+            AsyncStorage.setItem(SHOW_DUMMY_DATA_KEY, value.toString());
+          }
+          
+          // Show toast to confirm setting was saved
+          showToast(
+            value 
+              ? 'Dummy data will be displayed' 
+              : 'Dummy data will be hidden',
+            'info'
+          );
+          
+          // Log the setting change
+          logStorageService.addLog({
+            operation: 'export',
+            status: 'success',
+            details: `Changed show dummy data setting to: ${value ? 'Show' : 'Hide'}`
+          });
+        } catch (error) {
+          console.error('Error saving show dummy data setting:', error);
+          showToast('Failed to save setting', 'error');
+        }
         break;
     }
   };
@@ -1300,6 +1356,12 @@ export default function SettingsScreen() {
             />
           </View>
           
+          <View style={styles.settingDescription}>
+            <ThemedText style={styles.descriptionText}>
+              Display or hide sample data in your lists
+            </ThemedText>
+          </View>
+          
           <Divider style={styles.divider} />
           
           <View style={styles.settingItem}>
@@ -1383,6 +1445,26 @@ export default function SettingsScreen() {
               />
             </Menu>
           </View>
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <FontAwesome5 name="database" size={18} color="#4CAF50" style={styles.settingIcon} />
+              <ThemedText style={styles.settingLabel}>Show Dummy Data</ThemedText>
+            </View>
+            <Switch
+              value={showDummyData}
+              onValueChange={(value) => toggleSwitch('showDummyData', value)}
+              color="#4CAF50"
+            />
+          </View>
+          
+          <View style={styles.settingDescription}>
+            <ThemedText style={styles.descriptionText}>
+              Display or hide sample data in your lists
+            </ThemedText>
+          </View>
+          
+          <Divider style={styles.divider} />
           
           <View style={styles.dataButtons}>
             <Button 

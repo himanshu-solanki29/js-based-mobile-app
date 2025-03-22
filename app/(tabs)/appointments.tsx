@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, View, TextInput, ScrollView, Modal, Platform, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { StyleSheet, FlatList, TouchableOpacity, View, TextInput, ScrollView, Modal, Platform, Alert, ImageBackground } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
@@ -40,6 +40,7 @@ import {
 import useAppointmentStorage from '@/utils/useAppointmentStorage';
 import { getPatientById } from '@/utils/patientStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // First, define status color constants at the top of the file
 const STATUS_COLORS = {
@@ -64,6 +65,9 @@ const STATUS_COLORS = {
     accent: '#2196F3'
   }
 };
+
+// Constants
+const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
 
 export default function AppointmentsScreen() {
   const {
@@ -148,14 +152,39 @@ export default function AppointmentsScreen() {
   
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Filter appointments based on search query, selected date/range, and status
+  // Load show dummy data setting
+  const [showDummyData, setShowDummyData] = useState(true);
+  
   useEffect(() => {
-    let filtered = [...appointments];
+    const loadShowDummyDataSetting = async () => {
+      try {
+        let value;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          value = localStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        } else {
+          value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        }
+        
+        // Default to true if setting doesn't exist
+        setShowDummyData(value === null ? true : value === 'true');
+      } catch (error) {
+        console.error('Error loading show dummy data setting:', error);
+        // Default to true on error
+        setShowDummyData(true);
+      }
+    };
+    
+    loadShowDummyDataSetting();
+  }, []);
+  
+  // Filter appointments based on search query, selected date/range, and status
+  const filteredAppointmentsMemo = useMemo(() => {
+    let result = [...appointments];
     
     // Filter by search query
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(appointment => 
+      result = result.filter(appointment => 
         appointment.patientName.toLowerCase().includes(query) ||
         appointment.reason.toLowerCase().includes(query)
       );
@@ -163,9 +192,9 @@ export default function AppointmentsScreen() {
     
     // Filter by selected date or date range
     if (datePickerMode === 'single' && selectedDate) {
-      filtered = filtered.filter(appointment => appointment.date === selectedDate);
+      result = result.filter(appointment => appointment.date === selectedDate);
     } else if (datePickerMode === 'range' && (dateRange.start || dateRange.end)) {
-      filtered = filtered.filter(appointment => {
+      result = result.filter(appointment => {
         const appointmentDate = new Date(appointment.date);
         const startOk = !dateRange.start || appointmentDate >= new Date(dateRange.start);
         const endOk = !dateRange.end || appointmentDate <= new Date(dateRange.end);
@@ -175,14 +204,20 @@ export default function AppointmentsScreen() {
     
     // Filter by status
     if (selectedStatus !== 'all') {
-      filtered = filtered.filter(appointment => appointment.status === selectedStatus);
+      result = result.filter(appointment => appointment.status === selectedStatus);
     }
     
-    // Sort appointments by date (latest first)
-    filtered = sortAppointmentsByDateDesc(filtered);
+    // Filter out dummy/demo data if showDummyData is false
+    if (!showDummyData) {
+      result = result.filter(appointment => {
+        // Convert ID to number and check if it's a demo/initial ID (1-7)
+        const idNumber = parseInt(appointment.id);
+        return !(idNumber >= 1 && idNumber <= 7);
+      });
+    }
     
-    setFilteredAppointments(filtered);
-  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments, refreshTrigger]);
+    return result;
+  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments, showDummyData]);
 
   // Function to format the date filter for display
   const getFormattedDateRange = () => {
@@ -731,7 +766,7 @@ export default function AppointmentsScreen() {
       </View>
 
       <FlatList
-        data={filteredAppointments}
+        data={filteredAppointmentsMemo}
         renderItem={renderAppointmentItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
