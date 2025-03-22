@@ -274,20 +274,55 @@ export default function SettingsScreen() {
       const patients = await patientStorageService.getPatients();
       const appointments = await appointmentStorageService.getAppointments();
       
-      console.log('Exporting patients count:', patients?.length);
-      console.log('Exporting appointments count:', appointments?.length);
+      console.log('Original patients count:', patients?.length);
+      console.log('Original appointments count:', appointments?.length);
       
-      // Check if we have data to export
-      if ((!patients || patients.length === 0) && (!appointments || appointments.length === 0)) {
-        showToast('No data to export', 'warning');
+      // Filter out dummy/initial data (IDs 1-5 are typically initial patients)
+      const filteredPatients = patients?.filter(patient => {
+        // Convert ID to number and check if it's a demo/initial ID (1-5)
+        const idNumber = parseInt(patient.id);
+        // Check if this is likely a demo patient based on ID and/or email domain
+        const isDemoPatient = 
+          (idNumber >= 1 && idNumber <= 5) || 
+          (patient.email && patient.email.includes('example.com'));
+        console.log(`Patient ${patient.id} (${patient.name}) is demo: ${isDemoPatient}`);
+        return !isDemoPatient;
+      }) || [];
+      
+      // Filter out dummy/initial appointments (IDs 1-7 are typically initial appointments)
+      const filteredAppointments = appointments?.filter(appointment => {
+        // Convert ID to number and check if it's a demo/initial ID (1-7)
+        const idNumber = parseInt(appointment.id);
+        
+        // Check if this appointment is for a demo patient
+        const isForDemoPatient = filteredPatients.findIndex(p => p.id === appointment.patientId) === -1;
+        
+        // Check if it's a demo appointment based on ID or patient
+        const isDemoAppointment = (idNumber >= 1 && idNumber <= 7) || isForDemoPatient;
+        
+        console.log(`Appointment ${appointment.id} for patient ${appointment.patientId} is demo: ${isDemoAppointment}`);
+        
+        return !isDemoAppointment;
+      }) || [];
+      
+      console.log('Filtered patients count:', filteredPatients.length);
+      console.log('Filtered appointments count:', filteredAppointments.length);
+      
+      // Check if we have data to export after filtering
+      if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
+        if (patients?.length > 0 || appointments?.length > 0) {
+          showToast('Only demo data found - nothing to export', 'warning');
+        } else {
+          showToast('No data to export', 'warning');
+        }
         setIsExporting(false);
         return;
       }
       
       // Create a single JSON object containing both datasets
       const combinedData = {
-        patients: patients || [],
-        appointments: appointments || [],
+        patients: filteredPatients,
+        appointments: filteredAppointments,
         exportDate: new Date().toISOString(),
         appVersion: '1.0.0'
       };
@@ -823,9 +858,6 @@ export default function SettingsScreen() {
         } else if (totalInvalid > 0 && totalDuplicates === 0) {
           summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported.`;
           toastType = 'error';
-        } else if (totalDuplicates > 0 && totalInvalid > 0) {
-          summaryMessage = `No new data imported. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
-          toastType = 'warning';
         } else if (!patientsFile && !appointmentsFile) {
           summaryMessage = 'No valid data files found';
           toastType = 'warning';
