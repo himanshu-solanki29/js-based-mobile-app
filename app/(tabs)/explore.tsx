@@ -16,22 +16,7 @@ import {
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import usePatientStorage from '@/utils/usePatientStorage';
-import dummyDataService from "@/utils/dummyDataService";
-import { INITIAL_PATIENTS } from '@/utils/initialData';
-
-// Mock appointment data for adding new appointments
-const MOCK_APPOINTMENTS = [
-  {
-    id: '1',
-    patientId: '1',
-    patientName: 'John Doe',
-    date: '2023-06-15',
-    time: '09:30 AM',
-    reason: 'Follow-up',
-    status: 'confirmed',
-  },
-  // More appointments...
-];
+import logStorageService from '@/utils/logStorageService';
 
 // Define appointment type
 type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
@@ -57,52 +42,25 @@ export default function ExploreScreen() {
   const [isPatientFormVisible, setPatientFormVisible] = useState(false);
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
-  const [showDummyData, setShowDummyData] = useState(true);
   
-  // Load dummy data setting
+  // Initialize filtered patients on component mount
   useEffect(() => {
-    const loadShowDummyDataSetting = async () => {
-      try {
-        const showDummyData = await dummyDataService.getShowDummyDataSetting();
-        setShowDummyData(showDummyData);
-      } catch (error) {
-        console.error('Error loading show dummy data setting:', error);
-        setShowDummyData(true); // Default to true on error
-      }
-    };
-    
-    loadShowDummyDataSetting();
-  }, []);
-  
-  // Filter out dummy data if needed
-  const filteredByDummyDataSetting = useMemo(() => {
-    if (showDummyData) {
-      return patients;
-    } else {
-      // Filter out dummy patients (IDs 1-5)
-      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-      return patients.filter(patient => !initialPatientIds.includes(patient.id));
-    }
-  }, [patients, showDummyData]);
-
-  // Initialize filtered patients on component mount and when patients or dummy data setting changes
-  useEffect(() => {
-    setFilteredPatients(filteredByDummyDataSetting);
-  }, [filteredByDummyDataSetting]);
+    setFilteredPatients(patients);
+  }, [patients]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(filteredByDummyDataSetting);
+      setFilteredPatients(patients);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = filteredByDummyDataSetting.filter(patient => 
+      const filtered = patients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, filteredByDummyDataSetting]);
+  }, [searchQuery, patients]);
 
   const handleScheduleAppointment = async (appointmentData: {
     date: Date;
@@ -128,12 +86,26 @@ export default function ExploreScreen() {
       // Display success message
       showToast(`Appointment scheduled for ${formatDate(appointment.date)} at ${appointment.time}`, "success");
       
+      // Log the operation
+      logStorageService.addLog({
+        operation: 'CREATE_APPOINTMENT',
+        status: 'success',
+        details: `Scheduled appointment for patient ${appointmentData.patientName} on ${formatDate(appointment.date)} at ${appointment.time}`
+      });
+      
       // Close scheduler dialog
       setSchedulerVisible(false);
       setSelectedPatientId(null);
     } catch (error) {
       console.error("Error scheduling appointment:", error);
       showToast("Error scheduling appointment", "error");
+      
+      // Log the error
+      logStorageService.addLog({
+        operation: 'CREATE_APPOINTMENT',
+        status: 'error',
+        details: `Error scheduling appointment: ${error instanceof Error ? error.message : String(error)}`
+      });
     }
   };
   
