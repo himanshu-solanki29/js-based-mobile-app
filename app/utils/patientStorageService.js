@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { requestStoragePermissions, checkStoragePermissions } from '../runtime-permissions';
-import StorageService from './storageService';
 
 const PATIENT_STORAGE_KEY = 'patients';
+// List of dummy patient IDs (1-5) to avoid collisions
+const DUMMY_PATIENT_IDS = ['1', '2', '3', '4', '5'];
 
 // Helper function to log errors that might be happening during storage operations
 const logStorageError = (operation, error) => {
@@ -39,9 +40,8 @@ const logStorageError = (operation, error) => {
   }
 };
 
-class PatientStorageService extends StorageService {
+class PatientStorageService {
   constructor() {
-    super();
     this.patients = {};
     this.initialized = false;
   }
@@ -85,6 +85,7 @@ class PatientStorageService extends StorageService {
       this.patients = storedPatients;
       return storedPatients;
     } catch (error) {
+      logStorageError('loadPatients', error);
       console.error('Error loading patients:', error);
       return {};
     }
@@ -112,6 +113,7 @@ class PatientStorageService extends StorageService {
       
       return true;
     } catch (error) {
+      logStorageError('savePatients', error);
       console.error('Error saving patients:', error);
       return false;
     }
@@ -126,14 +128,40 @@ class PatientStorageService extends StorageService {
   }
 
   async addPatient(patient) {
-    if (!this.initialized) {
-      await this.init();
+    try {
+      if (!this.initialized) {
+        await this.init();
+      }
+      
+      // Generate a new ID that avoids dummy data collisions (IDs 1-5)
+      const existingIds = Object.keys(this.patients);
+      let newId;
+      
+      // Start ID from 6 onwards to avoid collision with dummy data
+      let idToTry = 6;
+      do {
+        newId = idToTry.toString();
+        idToTry++;
+      } while (existingIds.includes(newId) || DUMMY_PATIENT_IDS.includes(newId));
+      
+      // Create a new patient object with the generated ID
+      const patientWithId = {
+        ...patient,
+        id: newId
+      };
+      
+      this.patients[newId] = patientWithId;
+      
+      // Log patient creation for debugging
+      console.log(`Creating new patient with ID: ${newId}`);
+      
+      const success = await this.savePatients();
+      return success ? patientWithId : null;
+    } catch (error) {
+      logStorageError('addPatient', error);
+      console.error('Error adding patient:', error);
+      throw error;
     }
-    
-    this.patients[patient.id] = patient;
-    
-    const success = await this.savePatients();
-    return success ? patient : null;
   }
 
   async updatePatient(patient) {
@@ -181,24 +209,6 @@ class PatientStorageService extends StorageService {
   async clearAllPatients() {
     this.patients = {};
     return await this.savePatients();
-  }
-
-  async getData() {
-    try {
-      return await super.getData();
-    } catch (error) {
-      logStorageError('getData', error);
-      throw error;
-    }
-  }
-  
-  async saveData(data) {
-    try {
-      return await super.saveData(data);
-    } catch (error) {
-      logStorageError('saveData', error);
-      throw error;
-    }
   }
 }
 
