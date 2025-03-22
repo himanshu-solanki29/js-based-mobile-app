@@ -97,7 +97,9 @@ class PatientStorageService extends StorageService<PatientsData> {
     
     try {
       // Create a unique ID for the new patient
-      const patientId = (Object.keys(this.patients).length + 1).toString();
+      const timestamp = new Date().getTime();
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const patientId = `p_${timestamp}_${randomSuffix}`;
       
       // Create a new patient object
       const newPatient: Patient = {
@@ -116,14 +118,22 @@ class PatientStorageService extends StorageService<PatientsData> {
         userCreated: patientData.userCreated !== undefined ? patientData.userCreated : true // Default to true
       };
       
-      // Add the patient to our database
-      this.patients[patientId] = newPatient;
-      
       // Log patient creation for debugging
       console.log(`Creating new patient with ID: ${patientId}, userCreated: ${newPatient.userCreated}`);
       
-      // Persist to storage
-      await this.persistPatients();
+      // Add the patient to our database
+      this.patients[patientId] = newPatient;
+      
+      // Persist to storage with careful error handling
+      try {
+        await this.persistPatients();
+        console.log(`Successfully saved patient with ID: ${patientId} to storage`);
+      } catch (storageError) {
+        // If storage fails, remove from memory to maintain consistency
+        console.error('Error persisting patient to storage:', storageError);
+        delete this.patients[patientId];
+        throw new Error(`Failed to save patient to storage: ${storageError.message}`);
+      }
       
       return newPatient;
     } catch (error) {

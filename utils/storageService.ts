@@ -67,6 +67,7 @@ class StorageService<T> {
       if (Platform.OS === 'android') {
         const hasPermissions = await this.ensurePermissions();
         if (!hasPermissions) {
+          console.error('Storage permissions denied for key:', this.key);
           throw new Error('Storage permissions are required');
         }
       }
@@ -77,17 +78,25 @@ class StorageService<T> {
         if (isBrowser) {
           // Use localStorage for web in browser
           window.localStorage.setItem(this.key, jsonValue);
+          console.log(`Saved data to localStorage for key: ${this.key}`);
         } else {
           // Use memory storage for SSR
           memoryStorage[this.key] = jsonValue;
+          console.log(`Saved data to memory storage for key: ${this.key}`);
         }
       } else {
-        // Use AsyncStorage for native
-        await AsyncStorage.setItem(this.key, jsonValue);
+        // Use AsyncStorage for mobile
+        try {
+          await AsyncStorage.setItem(this.key, jsonValue);
+          console.log(`Saved data to AsyncStorage for key: ${this.key}`);
+        } catch (asyncStorageError) {
+          console.error(`AsyncStorage error for key ${this.key}:`, asyncStorageError);
+          throw new Error(`AsyncStorage error: ${asyncStorageError.message}`);
+        }
       }
-    } catch (e) {
-      console.error(`Error saving data to ${this.key}:`, e);
-      throw e;
+    } catch (error) {
+      console.error(`Error saving data for key ${this.key}:`, error);
+      throw error;
     }
   }
   

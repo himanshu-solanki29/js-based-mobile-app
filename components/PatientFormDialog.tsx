@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, View } from "react-native";
+import { StyleSheet, ScrollView, View, Alert, Platform } from "react-native";
 import { useState } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { 
@@ -11,6 +11,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { addPatient, PatientFormData } from "@/utils/patientStore";
 import { Portal, Modal } from 'react-native-paper';
 import { globalEventEmitter } from '@/app/(tabs)/index';
+import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
 
 interface PatientFormDialogProps {
   visible: boolean;
@@ -46,16 +47,32 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
   const handleSubmit = async () => {
     // Validate the form
     if (!formData.name.trim()) {
-      alert("Please enter patient name");
+      Alert.alert("Required Field", "Please enter patient name");
       return;
     }
     
     if (!formData.phone.trim()) {
-      alert("Please enter phone number");
+      Alert.alert("Required Field", "Please enter phone number");
       return;
     }
     
     try {
+      // On Android, check for storage permissions first
+      if (Platform.OS === 'android') {
+        const hasPermissions = await checkStoragePermissions();
+        if (!hasPermissions) {
+          const granted = await requestStoragePermissions();
+          if (!granted) {
+            Alert.alert(
+              "Permission Required", 
+              "Storage permission is needed to save patient data.",
+              [{ text: "OK" }]
+            );
+            return;
+          }
+        }
+      }
+      
       console.log("Creating patient with data:", formData);
       setIsSubmitting(true);
       
@@ -93,7 +110,11 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
       onSuccess(newPatient.id);
     } catch (error) {
       console.error("Error adding patient:", error);
-      alert(`Failed to create patient: ${error.message || "Unknown error"}. Please try again.`);
+      Alert.alert(
+        "Error Adding Patient", 
+        `${error.message || "Unknown error occurred"}. Please try again.`,
+        [{ text: "OK" }]
+      );
     } finally {
       setIsSubmitting(false);
     }
