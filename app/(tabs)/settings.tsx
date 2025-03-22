@@ -9,8 +9,15 @@ import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import { getPatientsArray } from '@/utils/patientStore';
 import { Colors } from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import patientStorageService from '@/utils/patientStorageService';
+import appointmentStorageService from '@/utils/appointmentStorageService';
+import { initializeStorage } from '@/utils/initializeStorage';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
 
 export default function SettingsScreen() {
+  const { showToast } = useGlobalToast();
+  const [isClearing, setIsClearing] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [dataSync, setDataSync] = useState(true);
@@ -83,7 +90,7 @@ export default function SettingsScreen() {
     );
   };
 
-  const clearAllData = () => {
+  const clearAllData = async () => {
     Alert.alert(
       'Clear All Data',
       'Are you sure you want to clear all app data? This action cannot be undone.',
@@ -95,13 +102,49 @@ export default function SettingsScreen() {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => {
-            // Show confirmation of success
-            Alert.alert(
-              'Data Cleared',
-              'All data has been cleared successfully.',
-              [{ text: 'OK' }]
-            );
+          onPress: async () => {
+            try {
+              setIsClearing(true);
+              showToast('Clearing all data...', 'info');
+              
+              // Clear all storage
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                // For web platform
+                window.localStorage.clear();
+                // Reset the first launch flag
+                window.localStorage.setItem('@app_first_launch', 'false');
+                
+                // Show success message before reload
+                showToast('All data cleared successfully. Reloading app...', 'success');
+                
+                // Give time for the toast to be seen
+                setTimeout(() => {
+                  // Reload the page to reset all React state and get fresh instances
+                  window.location.reload();
+                }, 1500);
+              } else {
+                // For native platforms
+                await AsyncStorage.clear();
+                // Reset the first launch flag
+                await AsyncStorage.setItem('@app_first_launch', 'false');
+                
+                // Show success message
+                showToast('All data has been cleared successfully', 'success');
+                setIsClearing(false);
+                
+                // In a production app, you might want to restart the app or navigate to a login screen
+                // For now, we'll just show a success message
+                Alert.alert(
+                  'Data Cleared',
+                  'All data has been cleared successfully. Please restart the app for changes to take effect.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } catch (error) {
+              console.error('Error clearing data:', error);
+              setIsClearing(false);
+              showToast('Failed to clear data. Please try again.', 'error');
+            }
           }
         }
       ]
@@ -264,6 +307,8 @@ export default function SettingsScreen() {
               textColor="#F44336"
               onPress={clearAllData}
               contentStyle={{ height: 40 }}
+              loading={isClearing}
+              disabled={isClearing}
             >
               Clear All Data
             </Button>
