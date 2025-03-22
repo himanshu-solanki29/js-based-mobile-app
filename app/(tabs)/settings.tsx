@@ -1,8 +1,8 @@
-import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useState } from 'react';
-import { Switch, Surface, Divider, Button } from 'react-native-paper';
+import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph } from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -227,6 +227,10 @@ export default function SettingsScreen() {
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
+  
+  // Add state for modals
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
 
   const toggleSwitch = (setting: string, value: boolean) => {
     switch (setting) {
@@ -846,104 +850,41 @@ export default function SettingsScreen() {
   };
 
   const clearAllData = async () => {
-    console.log('clearAllData function called');
+    console.log('clearAllData function called - showing export modal');
+    setShowExportModal(true);
+  };
+
+  const handleExportChoice = async (shouldExport) => {
+    console.log('Export choice:', shouldExport);
+    setShowExportModal(false);
     
-    // Try a different Alert implementation that doesn't rely on onPress
-    if (Platform.OS === 'web') {
-      // For web, we'll use the browser's built-in confirm
-      const shouldExport = window.confirm('Would you like to export all your data before clearing it?');
-      
-      if (shouldExport) {
-        console.log('Export option selected (browser confirm)');
-        try {
-          // First trigger the export
-          await exportPatientData();
-          // Then ask for final confirmation to clear data
-          const confirmClear = window.confirm('Are you sure you want to permanently delete all data? This action cannot be undone.');
-          if (confirmClear) {
-            console.log('Clear confirmed (browser confirm)');
-            executeDataClear();
-          } else {
-            console.log('Clear canceled (browser confirm)');
-          }
-        } catch (error) {
-          console.error('Error during export:', error);
-          showToast('Export failed. Data not cleared.', 'error');
-        }
-      } else if (shouldExport === false) {  // User clicked "Cancel"
-        console.log('No export selected (browser confirm)');
-        const confirmClear = window.confirm('Are you sure you want to permanently delete all data? This action cannot be undone.');
-        if (confirmClear) {
-          console.log('Clear confirmed after no export (browser confirm)');
-          executeDataClear();
-        } else {
-          console.log('Clear canceled after no export (browser confirm)');
-        }
-      } else {
-        console.log('Clear data operation canceled (browser confirm)');
+    if (shouldExport) {
+      try {
+        // First trigger the export
+        await exportPatientData();
+        // Then ask for final confirmation to clear data
+        setTimeout(() => {
+          setShowConfirmClearModal(true);
+        }, 500); // Add small delay to ensure first modal is closed
+      } catch (error) {
+        console.error('Error during export:', error);
+        showToast('Export failed. Data not cleared.', 'error');
       }
     } else {
-      // For native, use React Native Alert as before
-      Alert.alert(
-        'Export Data Before Clearing?',
-        'Would you like to export all your data before clearing it?',
-        [
-          { 
-            text: 'Yes, Export First',
-            style: 'default',
-            onPress: async () => {
-              console.log('Export option selected');
-              try {
-                // First trigger the export
-                await exportPatientData();
-                // Then ask for final confirmation to clear data
-                confirmClearData();
-              } catch (error) {
-                console.error('Error during export:', error);
-                showToast('Export failed. Data not cleared.', 'error');
-              }
-            }
-          },
-          {
-            text: 'No, Continue Without Export',
-            style: 'destructive',
-            onPress: () => {
-              console.log('Continue without export selected');
-              confirmClearData();
-            }
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => console.log('Clear data canceled')
-          }
-        ]
-      );
+      // Directly show confirm clear modal
+      setTimeout(() => {
+        setShowConfirmClearModal(true);
+      }, 500); // Add small delay to ensure first modal is closed
     }
   };
 
-  const confirmClearData = () => {
-    console.log('confirmClearData function called');
-    // Final confirmation before clearing data
-    Alert.alert(
-      'Confirm Clear All Data',
-      'Are you sure you want to permanently delete all data? This action cannot be undone.',
-      [
-        { 
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => console.log('Final clear confirmation canceled')
-        },
-        {
-          text: 'Clear Everything',
-          style: 'destructive',
-          onPress: () => {
-            console.log('Executing data clear');
-            executeDataClear();
-          }
-        }
-      ]
-    );
+  const handleConfirmClear = (confirmed) => {
+    console.log('Clear data confirmation:', confirmed);
+    setShowConfirmClearModal(false);
+    
+    if (confirmed) {
+      executeDataClear();
+    }
   };
 
   const executeDataClear = async () => {
@@ -1186,24 +1127,7 @@ export default function SettingsScreen() {
               textColor="#F44336"
               onPress={() => {
                 console.log('Clear All Data button pressed');
-                // Test with a simple alert to see if alerts work in general
-                Alert.alert(
-                  'Debug Alert',
-                  'This is a test alert. Click OK to proceed to the real clear data flow.',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        console.log('Debug alert confirmed, calling clearAllData()');
-                        clearAllData();
-                      }
-                    },
-                    {
-                      text: 'Cancel',
-                      style: 'cancel'
-                    }
-                  ]
-                );
+                clearAllData();
               }}
               contentStyle={{ height: 40 }}
               loading={isClearing}
@@ -1246,6 +1170,35 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Surface>
       </ScrollView>
+      
+      {/* Export confirmation modal */}
+      <Portal>
+        <Dialog visible={showExportModal} onDismiss={() => setShowExportModal(false)}>
+          <Dialog.Title>Export Data Before Clearing?</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>Would you like to export all your data before clearing it?</Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => handleExportChoice(true)}>Yes, Export First</Button>
+            <Button onPress={() => handleExportChoice(false)}>No, Continue</Button>
+            <Button onPress={() => setShowExportModal(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      
+      {/* Final clear confirmation modal */}
+      <Portal>
+        <Dialog visible={showConfirmClearModal} onDismiss={() => setShowConfirmClearModal(false)}>
+          <Dialog.Title>Confirm Clear All Data</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>Are you sure you want to permanently delete all data? This action cannot be undone.</Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowConfirmClearModal(false)}>Cancel</Button>
+            <Button mode="contained" buttonColor="#F44336" textColor="white" onPress={() => handleConfirmClear(true)}>Clear Everything</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ThemedView>
   );
 }
