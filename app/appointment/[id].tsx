@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert, ActivityIndicator, Text, Animated } from "react-native";
+import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert, ActivityIndicator, Text, Animated, SafeAreaView, Platform } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
@@ -425,7 +425,11 @@ export default function AppointmentDetailsScreen() {
         />
       </Appbar.Header>
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 32}}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{paddingBottom: Platform.OS === 'ios' ? 100 : 80}}
+      >
         {/* Appointment Header */}
         <Surface style={styles.headerCard} elevation={1}>
           <View style={styles.headerContent}>
@@ -598,9 +602,11 @@ export default function AppointmentDetailsScreen() {
             hideSubmitButton={true}  // Hide the submit button
           />
         )}
-        
-        {/* Action buttons at the bottom */}
-        <Surface style={styles.bottomActions} elevation={1}>
+      </ScrollView>
+      
+      {/* Fixed Footer for Actions */}
+      <SafeAreaView style={styles.footerContainer}>
+        <View style={styles.footerContent}>
           <Button 
             mode="outlined"
             icon={() => <FontAwesome5 name="arrow-left" size={16} color="#757575" />}
@@ -664,8 +670,8 @@ export default function AppointmentDetailsScreen() {
               </Button>
             </View>
           )}
-        </Surface>
-      </ScrollView>
+        </View>
+      </SafeAreaView>
       
       {/* Dialog for status change */}
       <Dialog visible={statusChangeDialogVisible} onDismiss={() => !actionInProgress && setStatusChangeDialogVisible(false)} style={styles.dialog}>
@@ -968,15 +974,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  bottomActions: {
-    margin: 16,
-    marginTop: 8,
-    marginBottom: 32,
+  footerContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     padding: 16,
-    borderRadius: 16,
     backgroundColor: 'white',
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    zIndex: 1000,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  footerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   cancelButton: {
     flex: 1,
@@ -984,8 +1004,19 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 8,
   },
-  completeButton: {
+  confirmButton: {
     flex: 2,
+    borderRadius: 8,
+  },
+  buttonGroup: {
+    flex: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelAppointmentButton: {
+    flex: 1,
+    marginRight: 8,
+    borderColor: '#F44336',
     borderRadius: 8,
   },
   dialog: {
@@ -1009,46 +1040,6 @@ const styles = StyleSheet.create({
     padding: 8,
     paddingRight: 16,
   },
-  statusMenuContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    elevation: 4,
-  },
-  medicalRecordFormContainer: {
-    padding: 16,
-  },
-  buttonGroup: {
-    flex: 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cancelAppointmentButton: {
-    flex: 1,
-    marginRight: 8,
-    borderColor: '#F44336',
-    borderRadius: 8,
-  },
-  confirmButton: {
-    flex: 1,
-    borderRadius: 8,
-  },
-  quickCompleteButton: {
-    flex: 1,
-    marginRight: 8,
-    borderColor: '#4CAF50',
-    borderRadius: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notFoundContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
   medicalSummary: {
     marginTop: 8,
     backgroundColor: '#F5F5F5',
@@ -1062,5 +1053,16 @@ const styles = StyleSheet.create({
   medicalSummaryLabel: {
     fontWeight: 'bold',
     color: '#555',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
 }); 
