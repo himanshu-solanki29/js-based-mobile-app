@@ -3,47 +3,20 @@ import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme, Appbar, ActivityIndicator } from 'react-native-paper';
+import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme, Appbar } from 'react-native-paper';
 import { useState, useEffect } from "react";
 import React from 'react';
-import { List } from 'react-native-paper';
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import usePatientStorage from "@/utils/usePatientStorage";
-import useAppointmentStorage from "@/utils/useAppointmentStorage";
+import { getPatientById } from "@/utils/patientStore";
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
-import { Patient } from '@/utils/patientStore';
+import { 
+  getPatientAppointments,
+  addAppointment, 
+  Appointment
+} from '@/utils/appointmentStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
-import { AppointmentStatus } from '@/utils/types';
-
-// Define the Appointment interface directly in this file
-interface Appointment {
-  id: string;
-  patientId: string;
-  patientName: string;
-  date: string;
-  time: string;
-  reason: string;
-  status: AppointmentStatus;
-  notes?: string;
-  medicalRecord?: any;
-}
-
-// Define types for visits and patient data
-type Visit = {
-  date: string;    // Date from completed appointment
-  complaint: string;
-  diagnosis: string;
-  bloodPressure: string;
-  weight: string;
-  prescription: string;
-};
-
-// Note: In a production app, visits would be generated from completed appointments
-type PatientsData = {
-  [key: string]: Patient;
-};
 
 // Mock appointment data used across the app
 // In a real app this would be in a central store/context
@@ -59,6 +32,36 @@ const MOCK_APPOINTMENTS = [
   },
   // More appointments would be here
 ];
+
+// Define types for visits and patient data
+type Visit = {
+  date: string;    // Date from completed appointment
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+};
+
+// Note: In a production app, visits would be generated from completed appointments
+
+type Patient = {
+  id: string;
+  name: string;
+  age: number;
+  gender: string;
+  phone: string;
+  email: string;
+  height: string;
+  weight: string;
+  bloodPressure: string;
+  medicalHistory: string;
+  visits: Visit[];
+};
+
+type PatientsData = {
+  [key: string]: Patient;
+};
 
 // Mock data for patient visits and details
 const MOCK_PATIENTS: PatientsData = {
@@ -153,56 +156,12 @@ const STATUS_COLORS = {
 export default function PatientDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const theme = useTheme();
   const patientId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const patient = getPatientById(patientId);
   const [isSchedulerVisible, setSchedulerVisible] = useState(false);
   const { showToast } = useGlobalToast();
-  const { getPatientById } = usePatientStorage();
-  const { addAppointment, getPatientAppointments } = useAppointmentStorage();
-  const [pastExpanded, setPastExpanded] = useState(false);
-  const [recordsExpanded, setRecordsExpanded] = useState(false);
 
-  // Load patient data when the component mounts
-  useEffect(() => {
-    const loadPatient = async () => {
-      try {
-        setLoading(true);
-        const data = await getPatientById(patientId);
-        setPatient(data);
-      } catch (error) {
-        console.error('Error loading patient:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPatient();
-  }, [patientId, getPatientById]);
-
-  // Load patient appointments
-  useEffect(() => {
-    const loadAppointments = async () => {
-      if (!patient) return;
-      
-      try {
-        setAppointmentsLoading(true);
-        const appointments = await getPatientAppointments(patientId);
-        setPatientAppointments(appointments);
-      } catch (error) {
-        console.error('Error loading patient appointments:', error);
-      } finally {
-        setAppointmentsLoading(false);
-      }
-    };
-    
-    loadAppointments();
-  }, [patient, patientId, getPatientAppointments]);
-
-  const handleScheduleAppointment = async (appointmentData: {
+  const handleScheduleAppointment = (appointmentData: {
     date: Date;
     time: string;
     reason: string;
@@ -210,46 +169,22 @@ export default function PatientDetailsScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    try {
-      // Use the appointment storage hook to add the appointment
-      const newAppointment = await addAppointment({
-        date: appointmentData.date,
-        time: appointmentData.time,
-        reason: appointmentData.reason,
-        notes: appointmentData.notes,
-        patientId: appointmentData.patientId,
-        status: 'pending'
-      });
-      
-      // Show toast notification
-      showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
-      
-      // Close the scheduler
-      setSchedulerVisible(false);
-      
-      // Refresh the appointments list
-      if (patient) {
-        const updatedAppointments = await getPatientAppointments(patientId);
-        setPatientAppointments(updatedAppointments);
-      }
-    } catch (error) {
-      console.error('Error scheduling appointment:', error);
-      showToast('Failed to schedule appointment', 'error');
-    }
+    // Use the appointmentStore to add the appointment
+    const newAppointment = addAppointment({
+      date: appointmentData.date,
+      time: appointmentData.time,
+      reason: appointmentData.reason,
+      notes: appointmentData.notes,
+      patientId: appointmentData.patientId,
+      status: 'pending'
+    });
+    
+    // Show toast notification
+    showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
+    
+    // Close the scheduler
+    setSchedulerVisible(false);
   };
-
-  // Show loading state while patient data is being fetched
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <Stack.Screen options={{ title: "Patient Details" }} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
-          <Text style={{marginTop: 16}}>Loading patient data...</Text>
-        </View>
-      </ThemedView>
-    );
-  }
 
   // If patient not found
   if (!patient) {
@@ -276,20 +211,6 @@ export default function PatientDetailsScreen() {
     );
   }
 
-  // Group and sort the visits by date (most recent first)
-  const sortedVisits = patient.visits 
-    ? [...patient.visits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    : [];
-    
-  // Prepare upcoming and past appointments
-  const upcomingAppointments = patientAppointments.filter(
-    apt => apt.status === 'pending' || apt.status === 'confirmed'
-  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-  const pastAppointments = patientAppointments.filter(
-    apt => apt.status === 'completed' || apt.status === 'cancelled'
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ 
@@ -306,31 +227,164 @@ export default function PatientDetailsScreen() {
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Patient Profile Card */}
-        <Surface style={styles.profileCard} elevation={1}>
-          <View style={styles.profileHeader}>
-            <Avatar.Text 
-              size={64} 
-              label={patient.name.substring(0, 2).toUpperCase()} 
-              style={styles.avatar}
-              color="#ffffff"
-            />
-            <View style={styles.profileInfo}>
-              <ThemedText style={styles.patientName}>{patient.name}</ThemedText>
-              <View style={styles.patientSubInfo}>
-                <ThemedText style={styles.patientDetail}>
-                  <FontAwesome5 name="calendar-alt" size={12} color="#757575" /> {patient.age} years
-                </ThemedText>
-                <ThemedText style={styles.patientDetail}>
-                  <FontAwesome5 name={patient.gender === 'Male' ? 'mars' : 'venus'} size={12} color="#757575" /> {patient.gender}
-                </ThemedText>
-              </View>
+        <Surface style={styles.profileCard} elevation={2}>
+          <View style={styles.profileContent}>
+            <View style={styles.avatarSection}>
+              <Avatar.Icon
+                size={64}
+                icon="account"
+                style={{ backgroundColor: '#FFFFFF' }}
+                color="#4CAF50"
+              />
             </View>
             
-            <Button
-              mode="contained"
+            <View style={styles.profileInfo}>
+              <Text style={styles.patientName}>{patient.name}</Text>
+              <View style={styles.patientMeta}>
+                <Text style={styles.metaText}>
+                  <FontAwesome5 name="birthday-cake" size={12} color="#757575" style={{marginRight: 4}} /> {patient.age} yrs
+                </Text>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.metaText}>
+                  <FontAwesome5 name="venus-mars" size={12} color="#757575" style={{marginRight: 4}} /> {patient.gender}
+                </Text>
+              </View>
+              <View style={styles.contactRow}>
+                <Button 
+                  icon="phone" 
+                  mode="text" 
+                  compact 
+                  style={styles.contactButton}
+                  labelStyle={styles.contactButtonLabel}
+                >
+                  Call
+                </Button>
+                <Button 
+                  icon="message-text-outline" 
+                  mode="text" 
+                  compact 
+                  style={styles.contactButton}
+                  labelStyle={styles.contactButtonLabel}
+                >
+                  Message
+                </Button>
+              </View>
+            </View>
+          </View>
+        </Surface>
+        
+        {/* Vital Stats */}
+        <View style={styles.vitalStatsContainer}>
+          <Surface style={styles.vitalStat} elevation={1}>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.height}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="ruler-vertical" size={12} color="#757575" /> Height
+                </Text>
+              </View>
+            </TouchableRipple>
+          </Surface>
+          
+          <Surface style={styles.vitalStat} elevation={1}>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.weight}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="weight" size={12} color="#757575" /> Weight
+                </Text>
+              </View>
+            </TouchableRipple>
+          </Surface>
+          
+          <Surface style={styles.vitalStat} elevation={1}>
+            <TouchableRipple
+              rippleColor="rgba(0, 0, 0, 0.1)"
+              style={{borderRadius: 12}}
+              onPress={() => {}}
+            >
+              <View style={styles.vitalStatContent}>
+                <Text style={styles.vitalValue}>{patient.bloodPressure}</Text>
+                <Text style={styles.vitalLabel}>
+                  <FontAwesome5 name="heartbeat" size={12} color="#757575" /> BP
+                </Text>
+              </View>
+            </TouchableRipple>
+          </Surface>
+        </View>
+        
+        {/* Patient Details */}
+        <Surface style={styles.detailsCard} elevation={1}>
+          <TouchableRipple
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{borderRadius: 12}}
+            onPress={() => {}}
+          >
+            <View>
+              <View style={styles.sectionHeader}>
+                <ThemedText style={styles.sectionTitle}>Contact Information</ThemedText>
+              </View>
+              <Divider style={styles.divider} />
+              
+              <View style={styles.detailItem}>
+                <FontAwesome5 name="phone" size={14} color="#757575" style={styles.detailIcon} />
+                <View>
+                  <Text style={styles.detailLabel}>Phone</Text>
+                  <Text style={styles.detailValue}>{patient.phone}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.detailItem}>
+                <FontAwesome5 name="envelope" size={14} color="#757575" style={styles.detailIcon} />
+                <View>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue}>{patient.email}</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableRipple>
+        </Surface>
+        
+        {/* Medical History */}
+        <Surface style={styles.detailsCard} elevation={1}>
+          <TouchableRipple
+            rippleColor="rgba(0, 0, 0, 0.1)"
+            style={{borderRadius: 12}}
+            onPress={() => {}}
+          >
+            <View>
+          <View style={styles.sectionHeader}>
+                <ThemedText style={styles.sectionTitle}>Medical History</ThemedText>
+              </View>
+              <Divider style={styles.divider} />
+              
+              <View style={styles.medicalHistoryBox}>
+                <ThemedText style={styles.medicalHistoryText}>
+                  {patient.medicalHistory || "No medical history recorded"}
+            </ThemedText>
+              </View>
+            </View>
+          </TouchableRipple>
+        </Surface>
+        
+        {/* Appointments Section */}
+        <Surface style={styles.appointmentsCard} elevation={1}>
+          <View style={styles.tabHeader}>
+            <ThemedText style={styles.sectionTitle}>Appointments</ThemedText>
+            <Button 
+              mode="contained" 
               onPress={() => setSchedulerVisible(true)}
               style={styles.scheduleButton}
-              icon={({size, color}) => <FontAwesome5 name="calendar-plus" size={size-2} color={color} />}
+              labelStyle={styles.scheduleButtonLabel}
+              icon="plus-circle"
               buttonColor="#4CAF50"
             >
               Schedule
@@ -339,217 +393,247 @@ export default function PatientDetailsScreen() {
           
           <Divider style={styles.divider} />
           
-          <View style={styles.contactInfo}>
-            <View style={styles.contactRow}>
-              <FontAwesome5 name="phone" size={16} color={theme.colors.primary} style={styles.contactIcon} />
-              <ThemedText style={styles.contactText}>{patient.phone}</ThemedText>
-            </View>
-            {patient.email && (
-              <View style={styles.contactRow}>
-                <FontAwesome5 name="envelope" size={16} color={theme.colors.primary} style={styles.contactIcon} />
-                <ThemedText style={styles.contactText}>{patient.email}</ThemedText>
+          {/* Upcoming Appointments */}
+          <View style={styles.appointmentsList}>
+            <Text style={styles.appointmentListHeader}>Upcoming</Text>
+            
+            {getPatientAppointments(patientId)
+              .filter(app => ['confirmed', 'pending'].includes(app.status))
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              .slice(0, 3)
+              .map((appointment, index) => (
+                <Surface
+                  key={appointment.id}
+                  style={[
+                    styles.appointmentCard,
+                    { backgroundColor: '#FFFFFF' }
+                  ]}
+                  elevation={1}
+                >
+                  <TouchableRipple
+                    rippleColor="rgba(0, 0, 0, 0.1)"
+                    style={{borderRadius: 12}}
+                    onPress={() => router.push(`/appointment/${appointment.id}`)}
+                  >
+                    <View style={styles.appointmentCardContent}>
+                      <View style={[
+                        styles.dateCircle, 
+                        { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                      ]}>
+                        <Text style={[
+                          styles.dateDay,
+                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                        ]}>
+                          {new Date(appointment.date).getDate()}
+                        </Text>
+                        <Text style={[
+                          styles.dateMonth,
+                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                        ]}>
+                          {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.appointmentInfo}>
+                        <View style={styles.appointmentMainInfo}>
+                          <Text style={styles.appointmentReason}>{appointment.reason}</Text>
+                          <Text style={styles.appointmentTime}>
+                            <FontAwesome5 
+                              name="clock" 
+                              size={12} 
+                              color="#757575" 
+                              style={{marginRight: 4}}
+                            /> {appointment.time}
+                          </Text>
+                        </View>
+                        
+                        <View style={[
+                          styles.statusChip,
+                          { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                        ]}>
+                          <Text style={[
+                            styles.statusChipText,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {appointment.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableRipple>
+                </Surface>
+              ))
+            }
+            
+            {getPatientAppointments(patientId)
+              .filter(app => ['confirmed', 'pending'].includes(app.status))
+              .length === 0 && (
+              <View style={styles.emptyState}>
+                <FontAwesome5 name="calendar-times" size={24} color="#CCCCCC" />
+                <Text style={styles.emptyStateText}>No upcoming appointments</Text>
+                <Button 
+                  mode="outlined" 
+                  onPress={() => setSchedulerVisible(true)}
+                  style={styles.scheduleEmptyButton}
+                  textColor="#4CAF50"
+                >
+                  Schedule Now
+                </Button>
               </View>
             )}
           </View>
-        </Surface>
-        
-        {/* Medical Information */}
-        <Surface style={styles.infoCard} elevation={1}>
-          <ThemedText style={styles.sectionTitle}>
-            <FontAwesome5 name="notes-medical" size={16} color={theme.colors.primary} style={styles.sectionIcon} /> 
-            Medical Information
-          </ThemedText>
           
-          <View style={styles.medicalInfoGrid}>
-            <View style={styles.medicalInfoItem}>
-              <ThemedText style={styles.infoLabel}>Height</ThemedText>
-              <ThemedText style={styles.infoValue}>{patient.height || 'Not recorded'}</ThemedText>
-            </View>
+          <Divider style={styles.sectionDivider} />
+          
+          {/* Past Appointments */}
+          <View style={styles.appointmentsList}>
+            <Text style={styles.appointmentListHeader}>Past Appointments</Text>
             
-            <View style={styles.medicalInfoItem}>
-              <ThemedText style={styles.infoLabel}>Weight</ThemedText>
-              <ThemedText style={styles.infoValue}>{patient.weight || 'Not recorded'}</ThemedText>
-            </View>
-            
-            <View style={styles.medicalInfoItem}>
-              <ThemedText style={styles.infoLabel}>Blood Pressure</ThemedText>
-              <ThemedText style={styles.infoValue}>{patient.bloodPressure || 'Not recorded'}</ThemedText>
-            </View>
-          </View>
-          
-          {patient.medicalHistory && (
-            <View style={styles.historySection}>
-              <ThemedText style={styles.historyTitle}>Medical History</ThemedText>
-              <ThemedText style={styles.historyText}>{patient.medicalHistory}</ThemedText>
-            </View>
-          )}
-        </Surface>
-        
-        {/* Upcoming Appointments */}
-        <Surface style={styles.infoCard} elevation={1}>
-          <ThemedText style={styles.sectionTitle}>
-            <FontAwesome5 name="calendar-check" size={16} color={theme.colors.primary} style={styles.sectionIcon} /> 
-            Upcoming Appointments
-          </ThemedText>
-          
-          {appointmentsLoading ? (
-            <View style={styles.loadingSection}>
-              <ActivityIndicator size="small" />
-              <ThemedText style={styles.loadingText}>Loading appointments...</ThemedText>
-            </View>
-          ) : upcomingAppointments.length > 0 ? (
-            upcomingAppointments.map((appointment) => {
-              const statusColors = STATUS_COLORS[appointment.status] || STATUS_COLORS.confirmed;
-              return (
-                <TouchableRipple
-                  key={appointment.id}
-                  onPress={() => router.push(`/appointment/${appointment.id}`)}
-                  style={styles.appointmentItem}
-                  rippleColor="rgba(0, 0, 0, 0.1)"
+            {getPatientAppointments(patientId)
+              .filter(app => ['completed', 'cancelled'].includes(app.status))
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .slice(0, 3)
+              .map((appointment, index) => (
+                <Surface 
+                  key={appointment.id} 
+                  style={[
+                    styles.appointmentCard, 
+                    { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#2196F3' }
+                  ]} 
+                  elevation={2}
                 >
-                  <View>
-                    <View style={styles.appointmentHeader}>
-                      <View style={styles.appointmentDate}>
-                        <FontAwesome5 name="calendar-day" size={12} color={statusColors.accent} />
-                        <ThemedText style={styles.appointmentDateText}>
-                          {formatDate(appointment.date)}
-                        </ThemedText>
-                      </View>
-                      
-                      <View style={styles.appointmentTime}>
-                        <FontAwesome5 name="clock" size={12} color={statusColors.accent} />
-                        <ThemedText style={styles.appointmentTimeText}>
-                          {appointment.time}
-                        </ThemedText>
-                      </View>
-                      
-                      <Badge 
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: statusColors.bg }
-                        ]}
-                      >
-                        <ThemedText style={[styles.statusText, { color: statusColors.text }]}>
-                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                        </ThemedText>
-                      </Badge>
+                  <View style={styles.appointmentCardContent}>
+                    <View style={[
+                      styles.dateIndicator,
+                      { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                    ]}>
+                      <Text style={[
+                        styles.dateDay,
+                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                      ]}>
+                        {new Date(appointment.date).getDate()}
+                      </Text>
+                      <Text style={[
+                        styles.dateMonth,
+                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                      ]}>
+                        {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
+                      </Text>
                     </View>
                     
-                    <ThemedText style={styles.appointmentReason}>{appointment.reason}</ThemedText>
-                    
-                    {appointment.notes && (
-                      <ThemedText style={styles.appointmentNotes}>Note: {appointment.notes}</ThemedText>
-                    )}
+                    <View style={styles.appointmentInfo}>
+                      <View style={styles.appointmentMainInfo}>
+                        <Text style={styles.appointmentReason}>{appointment.reason}</Text>
+                        <Text style={styles.appointmentTime}>
+                          <FontAwesome5 
+                            name="clock" 
+                            size={12} 
+                            color="#757575" 
+                            style={{marginRight: 4}}
+                          /> {appointment.time}
+                        </Text>
+                      </View>
+                      
+                      <View style={[
+                        styles.statusChip,
+                        { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                      ]}>
+                        <Text style={[
+                          styles.statusChipText,
+                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                        ]}>
+                          {appointment.status}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </TouchableRipple>
-              );
-            })
-          ) : (
-            <View style={styles.emptyState}>
-              <FontAwesome5 name="calendar-times" size={24} color="#9E9E9E" style={styles.emptyIcon} />
-              <ThemedText style={styles.emptyText}>No upcoming appointments</ThemedText>
+                  
+                  {appointment.status === 'completed' && (
+                    <>
+                      <Divider style={styles.recordDivider} />
+                      <View style={styles.medicalRecordSection}>
+                        <Text style={styles.medicalRecordSectionTitle}>
+                          <FontAwesome5 name="notes-medical" size={12} color={STATUS_COLORS[appointment.status]?.accent || "#2196F3"} style={{marginRight: 6}} />
+                          Medical Record
+                        </Text>
+                        
+                        {appointment.notes ? (
+                          <View style={styles.recordItemsGrid}>
+                            {/* Extract medical record details from notes */}
+                            {(() => {
+                              // Try to parse medical record from appointment notes
+                              const noteLines = appointment.notes.split('\n');
+                              const recordItems = [];
+                              
+                              // Add common items even if not found
+                              const recordMap = {
+                                'Complaint': '',
+                                'Diagnosis': '',
+                                'Blood Pressure': '',
+                                'Prescription': ''
+                              };
+                              
+                              // Extract data from notes
+                              noteLines.forEach(line => {
+                                Object.keys(recordMap).forEach(key => {
+                                  if (line.includes(`${key}:`)) {
+                                    recordMap[key] = line.split(`${key}:`)[1]?.trim() || 'Not recorded';
+                                  }
+                                });
+                              });
+                              
+                              // Create items for display
+                              return Object.entries(recordMap).map(([key, value], idx) => (
+                                <View key={idx} style={styles.recordItem}>
+                                  <Text style={styles.recordItemLabel}>{key}</Text>
+                                  <Text style={styles.recordItemValue}>{value || 'Not recorded'}</Text>
+                                </View>
+                              ));
+                            })()}
+                          </View>
+                        ) : (
+                          <Text style={styles.noRecordsText}>No medical record details available</Text>
+                        )}
+                      </View>
+                    </>
+                  )}
+                </Surface>
+              ))
+            }
+            
+            {getPatientAppointments(patientId)
+              .filter(app => ['completed', 'cancelled'].includes(app.status))
+              .length === 0 && (
+              <View style={styles.emptyState}>
+                <FontAwesome5 name="history" size={24} color="#CCCCCC" />
+                <Text style={styles.emptyStateText}>No appointment history</Text>
+              </View>
+            )}
+            
+            {getPatientAppointments(patientId)
+              .filter(app => ['completed', 'cancelled'].includes(app.status))
+              .length > 3 && (
               <Button 
-                mode="outlined" 
-                onPress={() => setSchedulerVisible(true)}
-                style={styles.scheduleEmptyButton}
-                buttonColor="#f0f0f0"
-                textColor="#4CAF50"
-                icon={({size, color}) => <FontAwesome5 name="calendar-plus" size={size-2} color={color} />}
+                mode="text" 
+                onPress={() => {
+                  // View all history logic would go here
+                  showToast('Full history view coming soon', 'info');
+                }}
+                style={styles.viewAllButton}
               >
-                Schedule New
+                View All History
               </Button>
-            </View>
-          )}
+            )}
+          </View>
         </Surface>
-        
-        {/* Past Appointments Section */}
-        <Card style={styles.card}>
-          <Card.Title 
-            title="Past Appointments" 
-            subtitle={`${pastAppointments.length} previous visits`}
-          />
-          <Card.Content>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-              <FontAwesome5 name="calendar-check" size={24} color="#5CDB95" style={{marginRight: 8}} />
-              <ThemedText style={{fontWeight: 'bold'}}>Previous Visits</ThemedText>
-            </View>
-            {pastAppointments.length > 0 ? (
-              pastAppointments.map((appointment) => (
-                <TouchableRipple
-                  key={appointment.id}
-                  onPress={() => router.push(`/appointment/${appointment.id}`)}
-                  style={styles.appointmentItem}
-                >
-                  <View>
-                    <View style={styles.appointmentHeader}>
-                      <ThemedText style={styles.appointmentDate}>
-                        {formatDate(appointment.date)}
-                      </ThemedText>
-                      <Badge style={{ backgroundColor: '#5CDB95' }}>
-                        {appointment.status}
-                      </Badge>
-                    </View>
-                    <ThemedText>{appointment.reason}</ThemedText>
-                  </View>
-                </TouchableRipple>
-              ))
-            ) : (
-              <ThemedText>Patient hasn't had any previous visits</ThemedText>
-            )}
-          </Card.Content>
-        </Card>
-        
-        {/* Medical Records Section */}
-        <Card style={styles.card}>
-          <Card.Title 
-            title="Medical Records" 
-            subtitle={`${sortedVisits.length} medical records`}
-          />
-          <Card.Content>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-              <FontAwesome5 name="file-medical-alt" size={24} color="#5CDB95" style={{marginRight: 8}} />
-              <ThemedText style={{fontWeight: 'bold'}}>Health Records</ThemedText>
-            </View>
-            {sortedVisits.length > 0 ? (
-              sortedVisits.map((visit, index) => (
-                <Card key={index} style={styles.visitCard}>
-                  <Card.Content>
-                    <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-                      <FontAwesome5 name="calendar" size={18} color="#5CDB95" style={{marginRight: 8}} />
-                      <ThemedText style={{fontWeight: 'bold'}}>{visit.date} - {visit.diagnosis}</ThemedText>
-                    </View>
-                    <View style={styles.visitDetail}>
-                      <ThemedText style={styles.label}>Chief Complaint:</ThemedText>
-                      <ThemedText>{visit.complaint}</ThemedText>
-                    </View>
-                    <View style={styles.visitDetail}>
-                      <ThemedText style={styles.label}>Blood Pressure:</ThemedText>
-                      <ThemedText>{visit.bloodPressure}</ThemedText>
-                    </View>
-                    <View style={styles.visitDetail}>
-                      <ThemedText style={styles.label}>Weight:</ThemedText>
-                      <ThemedText>{visit.weight}</ThemedText>
-                    </View>
-                    <View style={styles.visitDetail}>
-                      <ThemedText style={styles.label}>Prescription:</ThemedText>
-                      <ThemedText>{visit.prescription}</ThemedText>
-                    </View>
-                  </Card.Content>
-                </Card>
-              ))
-            ) : (
-              <ThemedText>No previous medical records found</ThemedText>
-            )}
-          </Card.Content>
-        </Card>
       </ScrollView>
-      
+
       {/* Appointment Scheduler */}
       <AppointmentScheduler
         isVisible={isSchedulerVisible}
         onClose={() => setSchedulerVisible(false)}
         onSchedule={handleScheduleAppointment}
-        patientId={patient.id}
+        patientId={patientId}
         patientName={patient.name}
       />
     </ThemedView>
@@ -559,18 +643,12 @@ export default function PatientDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F5F5F5',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notFoundContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    paddingTop: 0,
   },
   appBar: {
     backgroundColor: '#4CAF50',
@@ -578,217 +656,310 @@ const styles = StyleSheet.create({
   },
   appBarTitle: {
     color: 'white',
-    fontWeight: 'bold',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    fontSize: 18,
+    fontWeight: '500',
   },
   profileCard: {
-    padding: 16,
+    marginTop: 16,
     borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
-  profileHeader: {
+  profileContent: {
     flexDirection: 'row',
+    padding: 16,
     alignItems: 'center',
   },
-  avatar: {
-    backgroundColor: '#4CAF50',
+  avatarSection: {
+    marginRight: 16,
   },
   profileInfo: {
-    marginLeft: 16,
     flex: 1,
   },
   patientName: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#212121',
     marginBottom: 4,
   },
-  patientSubInfo: {
+  patientMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  patientDetail: {
-    marginRight: 16,
+  metaText: {
     fontSize: 14,
-    color: '#666',
+    color: '#757575',
   },
-  scheduleButton: {
-    borderRadius: 8,
-  },
-  divider: {
-    marginVertical: 16,
-  },
-  contactInfo: {
-    marginTop: 8,
+  metaDot: {
+    fontSize: 14,
+    color: '#BDBDBD',
+    marginHorizontal: 8,
   },
   contactRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
   },
-  contactIcon: {
-    marginRight: 12,
+  contactButton: {
+    marginRight: 8,
+    paddingHorizontal: 0,
+  },
+  contactButtonLabel: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  vitalStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  vitalStat: {
+    flex: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  vitalValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#212121',
+    marginBottom: 4,
+  },
+  vitalLabel: {
+    fontSize: 12,
+    color: '#757575',
+  },
+  detailsCard: {
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212121',
+  },
+  divider: {
+    backgroundColor: '#E0E0E0',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  detailIcon: {
+    marginRight: 16,
     width: 20,
     textAlign: 'center',
   },
-  contactText: {
-    fontSize: 16,
-  },
-  infoCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
-  },
-  sectionIcon: {
-    marginRight: 8,
-  },
-  medicalInfoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  medicalInfoItem: {
-    width: '50%',
-    paddingRight: 8,
-    marginBottom: 16,
-  },
-  infoLabel: {
-    fontSize: 14,
+  detailLabel: {
+    fontSize: 12,
     color: '#757575',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '500',
+  detailValue: {
+    fontSize: 15,
+    color: '#212121',
   },
-  historySection: {
-    marginTop: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+  medicalHistoryBox: {
+    padding: 16,
   },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  medicalHistoryText: {
+    fontSize: 15,
+    color: '#424242',
+    lineHeight: 22,
   },
-  historyText: {
-    fontSize: 14,
-    lineHeight: 20,
+  appointmentsCard: {
+    marginTop: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  appointmentItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginBottom: 8,
-  },
-  appointmentHeader: {
+  tabHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  appointmentDate: {
-    fontWeight: 'bold',
+  scheduleButton: {
+    borderRadius: 24,
+    elevation: 2,
+    paddingHorizontal: 8,
+  },
+  scheduleButtonLabel: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'none',
   },
-  appointmentDateText: {
-    marginLeft: 6,
+  appointmentsList: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  appointmentListHeader: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#616161',
+  },
+  appointmentCard: {
+    marginBottom: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  appointmentCardContent: {
+    flexDirection: 'row',
+    padding: 12,
+  },
+  dateCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dateDay: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dateMonth: {
+    fontSize: 12,
     fontWeight: '500',
   },
-  appointmentTime: {
+  appointmentInfo: {
+    flex: 1,
+    marginLeft: 12,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  appointmentTimeText: {
-    marginLeft: 6,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  appointmentMainInfo: {
+    flex: 1,
   },
   appointmentReason: {
     fontSize: 15,
+    fontWeight: '500',
+    color: '#212121',
     marginBottom: 4,
   },
-  appointmentNotes: {
+  appointmentTime: {
     fontSize: 13,
-    fontStyle: 'italic',
-    color: '#666',
+    color: '#757575',
+  },
+  statusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  viewRecordsButton: {
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    padding: 10,
+    alignItems: 'center',
+  },
+  viewRecordsText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4CAF50',
   },
   emptyState: {
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 24,
   },
-  emptyIcon: {
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginBottom: 16,
-    color: '#666',
+  emptyStateText: {
+    marginTop: 8,
+    marginBottom: 8,
+    fontSize: 14,
+    color: '#9E9E9E',
   },
   scheduleEmptyButton: {
-    borderWidth: 1,
     borderColor: '#4CAF50',
+    borderRadius: 20,
+  },
+  sectionDivider: {
+    backgroundColor: '#EEEEEE',
+    height: 8,
   },
   viewAllButton: {
+    alignSelf: 'center',
     marginTop: 8,
   },
-  visitCard: {
-    marginBottom: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  visitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  visitDate: {
-    fontWeight: 'bold',
-  },
-  visitDivider: {
-    marginBottom: 12,
-  },
-  visitDetail: {
-    marginBottom: 8,
-  },
-  visitLabel: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  visitValue: {
-    fontSize: 14,
-  },
-  loadingSection: {
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
-  loadingText: {
-    marginTop: 8,
-    color: '#666',
+  recordDivider: {
+    backgroundColor: '#EEEEEE',
+    height: 1,
   },
-  card: {
-    marginBottom: 12,
-    padding: 0,
-    backgroundColor: '#fff',
+  medicalRecordSection: {
+    padding: 12,
   },
-  label: {
-    fontWeight: 'bold',
+  medicalRecordSectionTitle: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#424242',
+    marginBottom: 8,
+  },
+  recordItemsGrid: {
+    flexDirection: 'column',
+  },
+  recordItem: {
+    marginBottom: 8,
+  },
+  recordItemLabel: {
+    fontSize: 12,
+    color: '#757575',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  recordItemValue: {
+    fontSize: 14,
+    color: '#424242',
+  },
+  noRecordsText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: '#9E9E9E',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  vitalStatContent: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  dateIndicator: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
 });
