@@ -61,16 +61,25 @@ const markAsLaunched = async (): Promise<void> => {
 };
 
 // Initialize storage with default data if needed
-export const initializeStorage = async (): Promise<void> => {
+export const initializeStorage = async (forceReset: boolean = false): Promise<void> => {
   try {
     // Check if this is the first launch
     const firstLaunch = await isFirstLaunch();
 
-    if (firstLaunch) {
-      console.log('First launch detected, initializing storage with default data');
+    if (firstLaunch || forceReset) {
+      console.log(forceReset ? 'Force reset requested' : 'First launch detected', 'initializing storage with default data');
       
       // The storage services will load initial data if none exists
       // This is handled in their constructors
+      
+      // When forcing reset, make sure to reinitialize services
+      if (forceReset) {
+        // Re-initialize patient storage service
+        await patientStorageService.reset();
+        
+        // Re-initialize appointment storage service
+        await appointmentStorageService.reset();
+      }
       
       // Mark as launched so we don't initialize again
       await markAsLaunched();

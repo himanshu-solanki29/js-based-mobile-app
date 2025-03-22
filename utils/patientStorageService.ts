@@ -156,6 +156,22 @@ class PatientStorageService extends StorageService<PatientsData> {
     return this.patients[id];
   }
   
+  // Reset storage to initial state
+  async reset(): Promise<void> {
+    try {
+      console.log('Resetting patient storage to initial state');
+      // Reset to initial data
+      this.patients = INITIAL_PATIENTS;
+      // Save to storage
+      await this.saveData(this.patients);
+      // Notify listeners
+      this.notifyListeners();
+    } catch (error) {
+      console.error('Error resetting patient storage:', error);
+      throw error;
+    }
+  }
+  
   // Add a medical record to a patient's history
   async addMedicalRecord(
     patientId: string, 

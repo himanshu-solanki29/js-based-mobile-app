@@ -255,6 +255,82 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     return appointment;
   }
   
+  // Update an existing appointment
+  async updateAppointment(id: string, data: Partial<Appointment>): Promise<Appointment | null> {
+    await this.ensureInitialized();
+    
+    // Find the appointment
+    const appointmentIndex = this.appointments.findIndex(a => a.id === id);
+    if (appointmentIndex === -1) return null;
+    
+    const appointment = this.appointments[appointmentIndex];
+    const oldStatus = appointment.status;
+    
+    // Update the appointment
+    Object.assign(appointment, data);
+    
+    // If the new status is 'completed', update the patient history
+    if (data.status === 'completed' && oldStatus !== 'completed') {
+      const patient = await patientStorageService.getPatientById(appointment.patientId);
+      if (patient) {
+        // Initialize with default values
+        const medicalRecord = {
+          complaint: appointment.reason,
+          diagnosis: 'No diagnosis recorded', // Default value
+          bloodPressure: patient.bloodPressure || 'Not measured',
+          weight: patient.weight || 'Not measured',
+          prescription: 'No prescription recorded'
+        };
+        
+        if (data.notes) {
+          // Parse medical information from notes
+          const complaintMatch = data.notes.match(/Complaint:\s*([^\n]+)/);
+          const diagnosisMatch = data.notes.match(/Diagnosis:\s*([^\n]+)/);
+          const bpMatch = data.notes.match(/Blood Pressure:\s*([^\n]+)/);
+          const weightMatch = data.notes.match(/Weight:\s*([^\n]+)/);
+          const prescriptionMatch = data.notes.match(/Prescription:\s*([^\n]+)/);
+          
+          if (complaintMatch) medicalRecord.complaint = complaintMatch[1];
+          if (diagnosisMatch) medicalRecord.diagnosis = diagnosisMatch[1];
+          if (bpMatch) medicalRecord.bloodPressure = bpMatch[1];
+          if (weightMatch) medicalRecord.weight = weightMatch[1];
+          if (prescriptionMatch) medicalRecord.prescription = prescriptionMatch[1];
+        }
+        
+        // Update patient record
+        await patientStorageService.addMedicalRecord(appointment.patientId, {
+          date: appointment.date,
+          diagnosis: medicalRecord.diagnosis,
+          bloodPressure: medicalRecord.bloodPressure,
+          weight: medicalRecord.weight,
+          prescription: medicalRecord.prescription,
+          complaint: medicalRecord.complaint
+        });
+      }
+    }
+    
+    // Save changes
+    await this.persistAppointments();
+    
+    return appointment;
+  }
+  
+  // Reset storage to initial state
+  async reset(): Promise<void> {
+    try {
+      console.log('Resetting appointment storage to initial state');
+      // Reset to initial data
+      this.appointments = INITIAL_APPOINTMENTS.slice();
+      // Save to storage
+      await this.saveData(this.appointments);
+      // Notify listeners
+      this.notifyListeners();
+    } catch (error) {
+      console.error('Error resetting appointment storage:', error);
+      throw error;
+    }
+  }
+  
   // Subscribe to changes in appointment data
   subscribe(callback: () => void) {
     this.listeners.push(callback);

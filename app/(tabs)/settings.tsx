@@ -846,64 +846,124 @@ export default function SettingsScreen() {
   };
 
   const clearAllData = async () => {
+    // First ask if the user wants to export data before clearing
     Alert.alert(
-      'Clear All Data',
-      'Are you sure you want to clear all app data? This action cannot be undone.',
+      'Export Data Before Clearing?',
+      'Would you like to export all your data before clearing it?',
+      [
+        { 
+          text: 'Yes, Export First',
+          style: 'default',
+          onPress: async () => {
+            try {
+              // First trigger the export
+              await exportPatientData();
+              // Then ask for final confirmation to clear data
+              confirmClearData();
+            } catch (error) {
+              console.error('Error during export:', error);
+              showToast('Export failed. Data not cleared.', 'error');
+            }
+          }
+        },
+        {
+          text: 'No, Continue Without Export',
+          style: 'destructive',
+          onPress: confirmClearData
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  const confirmClearData = () => {
+    // Final confirmation before clearing data
+    Alert.alert(
+      'Confirm Clear All Data',
+      'Are you sure you want to permanently delete all data? This action cannot be undone.',
       [
         { 
           text: 'Cancel',
           style: 'cancel'
         },
         {
-          text: 'Clear All',
+          text: 'Clear Everything',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsClearing(true);
-              showToast('Clearing all data...', 'info');
-              
-              // Clear all storage
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                // For web platform
-                window.localStorage.clear();
-                // Reset the first launch flag
-                window.localStorage.setItem('@app_first_launch', 'false');
-                
-                // Show success message before reload
-                showToast('All data cleared successfully. Reloading app...', 'success');
-                
-                // Give time for the toast to be seen
-                setTimeout(() => {
-                  // Reload the page to reset all React state and get fresh instances
-                  window.location.reload();
-                }, 1500);
-              } else {
-                // For native platforms
-                await AsyncStorage.clear();
-                // Reset the first launch flag
-                await AsyncStorage.setItem('@app_first_launch', 'false');
-                
-                // Show success message
-                showToast('All data has been cleared successfully', 'success');
-                setIsClearing(false);
-                
-                // In a production app, you might want to restart the app or navigate to a login screen
-                // For now, we'll just show a success message
-                Alert.alert(
-                  'Data Cleared',
-                  'All data has been cleared successfully. Please restart the app for changes to take effect.',
-                  [{ text: 'OK' }]
-                );
-              }
-            } catch (error) {
-              console.error('Error clearing data:', error);
-              setIsClearing(false);
-              showToast('Failed to clear data. Please try again.', 'error');
-            }
-          }
+          onPress: executeDataClear
         }
       ]
     );
+  };
+
+  const executeDataClear = async () => {
+    try {
+      setIsClearing(true);
+      showToast('Clearing all data...', 'info');
+      
+      // Clear all storage
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        // For web platform
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          // Skip app configuration keys that should be preserved
+          if (key && !key.startsWith('@app_config')) {
+            localStorage.removeItem(key);
+          }
+        }
+        
+        // Set first launch to false to prevent re-initialization with demo data
+        localStorage.setItem('@app_first_launch', 'false');
+        
+        // Show success message before reload
+        showToast('All data cleared successfully. Reloading app...', 'success');
+        
+        // Re-initialize storage with empty data
+        await initializeStorage(true);
+        
+        // Give time for the toast to be seen
+        setTimeout(() => {
+          // Reload the page to reset all React state and get fresh instances
+          window.location.reload();
+        }, 1500);
+      } else {
+        // For native platforms
+        // Get all keys
+        const allKeys = await AsyncStorage.getAllKeys();
+        
+        // Filter out configuration keys that should be preserved
+        const keysToRemove = allKeys.filter(key => !key.startsWith('@app_config'));
+        
+        // Remove all data keys
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+        }
+        
+        // Set first launch to false to prevent re-initialization with demo data
+        await AsyncStorage.setItem('@app_first_launch', 'false');
+        
+        // Re-initialize storage with empty data
+        await initializeStorage(true);
+        
+        // Show success message
+        showToast('All data has been cleared successfully', 'success');
+        
+        // In a production app, you might want to restart the app or navigate to a login screen
+        // For now, we'll just show a success message
+        Alert.alert(
+          'Data Cleared',
+          'All data has been cleared successfully. Please restart the app for changes to take effect.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      showToast('Failed to clear data: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   return (
