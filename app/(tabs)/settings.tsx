@@ -846,40 +846,84 @@ export default function SettingsScreen() {
   };
 
   const clearAllData = async () => {
-    // First ask if the user wants to export data before clearing
-    Alert.alert(
-      'Export Data Before Clearing?',
-      'Would you like to export all your data before clearing it?',
-      [
-        { 
-          text: 'Yes, Export First',
-          style: 'default',
-          onPress: async () => {
-            try {
-              // First trigger the export
-              await exportPatientData();
-              // Then ask for final confirmation to clear data
-              confirmClearData();
-            } catch (error) {
-              console.error('Error during export:', error);
-              showToast('Export failed. Data not cleared.', 'error');
-            }
+    console.log('clearAllData function called');
+    
+    // Try a different Alert implementation that doesn't rely on onPress
+    if (Platform.OS === 'web') {
+      // For web, we'll use the browser's built-in confirm
+      const shouldExport = window.confirm('Would you like to export all your data before clearing it?');
+      
+      if (shouldExport) {
+        console.log('Export option selected (browser confirm)');
+        try {
+          // First trigger the export
+          await exportPatientData();
+          // Then ask for final confirmation to clear data
+          const confirmClear = window.confirm('Are you sure you want to permanently delete all data? This action cannot be undone.');
+          if (confirmClear) {
+            console.log('Clear confirmed (browser confirm)');
+            executeDataClear();
+          } else {
+            console.log('Clear canceled (browser confirm)');
           }
-        },
-        {
-          text: 'No, Continue Without Export',
-          style: 'destructive',
-          onPress: confirmClearData
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
+        } catch (error) {
+          console.error('Error during export:', error);
+          showToast('Export failed. Data not cleared.', 'error');
         }
-      ]
-    );
+      } else if (shouldExport === false) {  // User clicked "Cancel"
+        console.log('No export selected (browser confirm)');
+        const confirmClear = window.confirm('Are you sure you want to permanently delete all data? This action cannot be undone.');
+        if (confirmClear) {
+          console.log('Clear confirmed after no export (browser confirm)');
+          executeDataClear();
+        } else {
+          console.log('Clear canceled after no export (browser confirm)');
+        }
+      } else {
+        console.log('Clear data operation canceled (browser confirm)');
+      }
+    } else {
+      // For native, use React Native Alert as before
+      Alert.alert(
+        'Export Data Before Clearing?',
+        'Would you like to export all your data before clearing it?',
+        [
+          { 
+            text: 'Yes, Export First',
+            style: 'default',
+            onPress: async () => {
+              console.log('Export option selected');
+              try {
+                // First trigger the export
+                await exportPatientData();
+                // Then ask for final confirmation to clear data
+                confirmClearData();
+              } catch (error) {
+                console.error('Error during export:', error);
+                showToast('Export failed. Data not cleared.', 'error');
+              }
+            }
+          },
+          {
+            text: 'No, Continue Without Export',
+            style: 'destructive',
+            onPress: () => {
+              console.log('Continue without export selected');
+              confirmClearData();
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => console.log('Clear data canceled')
+          }
+        ]
+      );
+    }
   };
 
   const confirmClearData = () => {
+    console.log('confirmClearData function called');
     // Final confirmation before clearing data
     Alert.alert(
       'Confirm Clear All Data',
@@ -887,12 +931,16 @@ export default function SettingsScreen() {
       [
         { 
           text: 'Cancel',
-          style: 'cancel'
+          style: 'cancel',
+          onPress: () => console.log('Final clear confirmation canceled')
         },
         {
           text: 'Clear Everything',
           style: 'destructive',
-          onPress: executeDataClear
+          onPress: () => {
+            console.log('Executing data clear');
+            executeDataClear();
+          }
         }
       ]
     );
@@ -1136,7 +1184,27 @@ export default function SettingsScreen() {
               icon={() => <FontAwesome5 name="trash-alt" size={16} color="#F44336" />}
               style={styles.clearDataButton}
               textColor="#F44336"
-              onPress={clearAllData}
+              onPress={() => {
+                console.log('Clear All Data button pressed');
+                // Test with a simple alert to see if alerts work in general
+                Alert.alert(
+                  'Debug Alert',
+                  'This is a test alert. Click OK to proceed to the real clear data flow.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        console.log('Debug alert confirmed, calling clearAllData()');
+                        clearAllData();
+                      }
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel'
+                    }
+                  ]
+                );
+              }}
               contentStyle={{ height: 40 }}
               loading={isClearing}
               disabled={isClearing}
