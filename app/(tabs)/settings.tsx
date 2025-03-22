@@ -61,6 +61,8 @@ class LogStorageService extends StorageService<LogEntry[]> {
       ...entry
     };
     
+    console.log('Adding log entry:', newLog); // Add debug logging
+    
     // Add to local logs
     this.logs = [newLog, ...this.logs].slice(0, 100); // Keep only last 100 logs
     
@@ -392,6 +394,10 @@ export default function SettingsScreen() {
       // Convert to JSON string
       const jsonData = JSON.stringify(exportData, null, 2);
       
+      // Get file size for logging
+      const fileSize = jsonData.length;
+      const fileSizeKB = Math.round(fileSize / 1024);
+      
       // Generate timestamp for filename
       const timestamp = new Date().toISOString().replace(/:/g, '-');
       const filename = `holistic_health_export_${timestamp}.json`;
@@ -417,6 +423,8 @@ export default function SettingsScreen() {
           summaryMessage += ` (${detailParts.join(', ')})`;
         }
         
+        summaryMessage += ` - File size: ${fileSizeKB}KB`;
+        
         return summaryMessage;
       };
       
@@ -438,15 +446,32 @@ export default function SettingsScreen() {
         URL.revokeObjectURL(url);
         
         showToast('Export complete. ' + formatExportStats(), 'success');
+        
+        // Add successful export log with file info
+        await logStorageService.addLog({
+          operation: 'export',
+          status: 'success',
+          details: `${logDetails} (Web download: ${filename})`
+        });
       } else if (Platform.OS === 'android') {
         try {
           // On Android, use StorageAccessFramework to allow saving to Downloads folder
           const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
           if (!permissions.granted) {
             showToast('Permission denied to save file', 'error');
+            
+            // Log permission denial
+            await logStorageService.addLog({
+              operation: 'export',
+              status: 'error',
+              details: 'Export failed: Permission denied to access storage'
+            });
+            
             setIsExporting(false);
             return;
           }
+          
+          console.log('Android export: directory permission granted for:', permissions.directoryUri);
           
           // Create and write to file in user-selected directory
           const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
@@ -455,12 +480,30 @@ export default function SettingsScreen() {
             'application/json'
           );
           
+          console.log('Android export: created file at:', fileUri);
+          
           await FileSystem.StorageAccessFramework.writeAsStringAsync(fileUri, jsonData);
           
+          console.log('Android export: successfully wrote content to file');
+          
           showToast('Export complete. ' + formatExportStats(), 'success');
+          
+          // Add successful export log with file info
+          await logStorageService.addLog({
+            operation: 'export',
+            status: 'success',
+            details: `${logDetails} (Android file: ${fileUri.split('/').pop()})`
+          });
         } catch (fsError) {
           console.error('Android file save error:', fsError);
           showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
+          
+          // Log specific error for Android
+          await logStorageService.addLog({
+            operation: 'export',
+            status: 'error',
+            details: `Export to Android storage failed: ${fsError.message || 'Unknown file system error'}`
+          });
         }
       } else {
         // For iOS platforms
@@ -477,6 +520,8 @@ export default function SettingsScreen() {
           const filePath = `${exportDir}${filename}`;
           await FileSystem.writeAsStringAsync(filePath, jsonData);
           
+          console.log('iOS export: saved file to:', filePath);
+          
           // Check if sharing is available
           if (await Sharing.isAvailableAsync()) {
             // Share the file
@@ -487,22 +532,35 @@ export default function SettingsScreen() {
             });
             
             showToast('Export complete. ' + formatExportStats(), 'success');
+            
+            // Add successful export log with file info
+            await logStorageService.addLog({
+              operation: 'export',
+              status: 'success',
+              details: `${logDetails} (iOS share: ${filename})`
+            });
           } else {
             Alert.alert('Error', 'Sharing is not available on this device');
+            
+            // Log sharing not available error
+            await logStorageService.addLog({
+              operation: 'export',
+              status: 'error',
+              details: 'Export failed: Sharing not available on this device'
+            });
           }
         } catch (fsError) {
           console.error('iOS file save error:', fsError);
           showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
+          
+          // Log specific error for iOS
+          await logStorageService.addLog({
+            operation: 'export',
+            status: 'error',
+            details: `Export to iOS storage failed: ${fsError.message || 'Unknown file system error'}`
+          });
         }
       }
-      
-      // Add successful export log
-      await logStorageService.addLog({
-        operation: 'export',
-        status: 'success',
-        details: logDetails
-      });
-      
     } catch (error) {
       console.error('Export error:', error);
       showToast('Failed to export data: ' + (error.message || 'Unknown error'), 'error');
@@ -600,6 +658,7 @@ export default function SettingsScreen() {
       console.log('Processing file:', fileName);
       
       let fileContent;
+      let fileSize = 0;
       
       if (Platform.OS === 'web') {
         // Read file content on web
@@ -608,8 +667,13 @@ export default function SettingsScreen() {
           reader.onload = (e) => resolve(e.target.result);
           reader.readAsText(file);
         });
+        fileSize = fileContent.length;
+        console.log(`Web import: Read file ${fileName}, size: ${Math.round(fileSize/1024)}KB`);
       } else {
         // Read file content on mobile
+        const fileInfo = await FileSystem.getInfoAsync(file.uri);
+        fileSize = fileInfo.exists ? (fileInfo as any).size || 0 : 0;
+        console.log(`Mobile import: Reading file ${fileName}, size: ${Math.round(fileSize/1024)}KB`);
         fileContent = await FileSystem.readAsStringAsync(file.uri);
       }
       
@@ -633,24 +697,51 @@ export default function SettingsScreen() {
       
       // Determine if it's JSON or CSV
       let importedData;
+      let fileType = 'unknown';
       
       if (fileName.endsWith('.json')) {
         // Parse JSON data
+        fileType = 'json';
         try {
           importedData = JSON.parse(fileContent);
           console.log('Successfully parsed JSON data');
         } catch (jsonError) {
           console.error('Failed to parse JSON:', jsonError);
           showToast('Invalid JSON file format', 'error');
+          
+          // Log JSON parsing error
+          await logStorageService.addLog({
+            operation: 'import',
+            status: 'error',
+            details: `Failed to parse JSON file ${fileName}: ${jsonError.message}`
+          });
+          
           setIsImporting(false);
           return;
         }
       } else if (fileName.endsWith('.csv')) {
         // For backward compatibility with old CSV exports
+        fileType = 'csv';
         showToast('Processing CSV file...', 'info');
+        
+        // Log CSV processing start
+        await logStorageService.addLog({
+          operation: 'import',
+          status: 'warning',
+          details: `Starting legacy CSV import for file: ${fileName}`
+        });
+        
         return await processLegacyCSVImport([file]);
       } else {
         showToast('Unsupported file format. Please use .json or .csv files.', 'error');
+        
+        // Log unsupported format
+        await logStorageService.addLog({
+          operation: 'import',
+          status: 'error',
+          details: `Unsupported file format: ${fileName}. Only .json and .csv are supported.`
+        });
+        
         setIsImporting(false);
         return;
       }
@@ -658,6 +749,14 @@ export default function SettingsScreen() {
       // Check if the JSON has the expected structure
       if (!importedData || (!importedData.patients && !importedData.appointments)) {
         showToast('Invalid data format: missing patients or appointments data', 'error');
+        
+        // Log invalid data structure
+        await logStorageService.addLog({
+          operation: 'import',
+          status: 'error',
+          details: `Invalid data structure in file ${fileName}: missing patients or appointments data`
+        });
+        
         setIsImporting(false);
         return;
       }
@@ -695,6 +794,7 @@ export default function SettingsScreen() {
         }
         
         if (stats.patients.success > 0) {
+          console.log(`Adding ${stats.patients.success} new patients to storage`);
           await patientStorageService.bulkAddPatients(newPatients);
         }
       }
@@ -726,6 +826,7 @@ export default function SettingsScreen() {
         }
         
         if (stats.appointments.success > 0) {
+          console.log(`Adding ${stats.appointments.success} new appointments to storage`);
           await appointmentStorageService.bulkAddAppointments(newAppointments);
         }
       }
@@ -760,6 +861,9 @@ export default function SettingsScreen() {
             summaryMessage += ` (${detailParts.join(', ')})`;
           }
           
+          // Add file info
+          summaryMessage += ` from ${fileType.toUpperCase()} file: ${fileName} (${Math.round(fileSize/1024)}KB)`;
+          
           // Add skipped/invalid counts if any
           if (totalDuplicates > 0 || totalInvalid > 0) {
             const skipParts = [];
@@ -775,15 +879,16 @@ export default function SettingsScreen() {
             }
           }
         } else if (totalDuplicates > 0 && totalInvalid === 0) {
-          summaryMessage = `All ${totalDuplicates} records were duplicates. Nothing new imported.`;
+          summaryMessage = `All ${totalDuplicates} records were duplicates. Nothing new imported from ${fileName}.`;
+          toastType = 'warning';
         } else if (totalInvalid > 0 && totalDuplicates === 0) {
-          summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported.`;
+          summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported from ${fileName}.`;
           toastType = 'error';
         } else if (totalDuplicates > 0 && totalInvalid > 0) {
-          summaryMessage = `No new data imported. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
+          summaryMessage = `No new data imported from ${fileName}. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
           toastType = 'warning';
         } else {
-          summaryMessage = 'No valid data found to import';
+          summaryMessage = `No valid data found to import in ${fileName}`;
           toastType = 'warning';
         }
         
@@ -800,6 +905,8 @@ export default function SettingsScreen() {
         status: results.type === 'success' ? 'success' : (results.type === 'error' ? 'error' : 'warning'),
         details: results.message
       });
+      
+      console.log('Import completed with result:', results);
       
     } catch (error) {
       console.error('Error processing import file:', error);
@@ -1014,8 +1121,8 @@ export default function SettingsScreen() {
         } else if (totalInvalid > 0 && totalDuplicates === 0) {
           summaryMessage = `All ${totalInvalid} records were invalid. Nothing imported.`;
           toastType = 'error';
-        } else if (!patientsFile && !appointmentsFile) {
-          summaryMessage = 'No valid data files found';
+        } else if (totalDuplicates > 0 && totalInvalid > 0) {
+          summaryMessage = `No new data imported. Found ${totalDuplicates} duplicates and ${totalInvalid} invalid records.`;
           toastType = 'warning';
         } else {
           summaryMessage = 'No valid data found to import';
@@ -1206,6 +1313,16 @@ export default function SettingsScreen() {
 
   const viewLogs = async () => {
     setShowLogMenu(false);
+    
+    // Refresh logs list when opening the logs modal
+    try {
+      const updatedLogs = await logStorageService.getLogs();
+      setLogs(updatedLogs);
+      console.log(`Loaded ${updatedLogs.length} log entries`);
+    } catch (error) {
+      console.error('Error refreshing logs:', error);
+    }
+    
     setShowLogs(true);
   };
   
@@ -1792,10 +1909,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
+    color: '#333333',
   },
   logDetails: {
     fontSize: 14,
     marginBottom: 8,
+    lineHeight: 20,
   },
   logTimestamp: {
     fontSize: 12,
