@@ -9,12 +9,16 @@ import React from 'react';
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { getPatientById } from "@/utils/patientStore";
+import { 
+  getPatientById,
+  usePatients
+} from "@/utils/patientStore";
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { 
   getPatientAppointments,
   addAppointment, 
-  Appointment
+  Appointment,
+  useAppointments
 } from '@/utils/appointmentStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 
@@ -157,11 +161,53 @@ export default function PatientDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const patientId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
-  const patient = getPatientById(patientId);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isSchedulerVisible, setSchedulerVisible] = useState(false);
   const { showToast } = useGlobalToast();
+  
+  // Use the appointment hook to get all appointments
+  const { appointments, loading: appointmentsLoading } = useAppointments();
+  
+  // Filter patient appointments
+  const patientAppointments = React.useMemo(() => {
+    if (!appointments) return [];
+    return appointments.filter(app => app.patientId === patientId);
+  }, [appointments, patientId]);
+  
+  // Filter upcoming appointments
+  const upcomingAppointments = React.useMemo(() => {
+    return patientAppointments
+      .filter(app => ['confirmed', 'pending'].includes(app.status))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [patientAppointments]);
+  
+  // Filter past appointments
+  const pastAppointments = React.useMemo(() => {
+    return patientAppointments
+      .filter(app => ['completed', 'cancelled'].includes(app.status))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [patientAppointments]);
+  
+  // Load patient data
+  useEffect(() => {
+    const loadPatient = async () => {
+      try {
+        setLoading(true);
+        const patientData = await getPatientById(patientId);
+        setPatient(patientData);
+      } catch (error) {
+        console.error('Error loading patient:', error);
+        setPatient(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadPatient();
+  }, [patientId]);
 
-  const handleScheduleAppointment = (appointmentData: {
+  const handleScheduleAppointment = async (appointmentData: {
     date: Date;
     time: string;
     reason: string;
@@ -169,22 +215,39 @@ export default function PatientDetailsScreen() {
     patientId: string;
     patientName: string;
   }) => {
-    // Use the appointmentStore to add the appointment
-    const newAppointment = addAppointment({
-      date: appointmentData.date,
-      time: appointmentData.time,
-      reason: appointmentData.reason,
-      notes: appointmentData.notes,
-      patientId: appointmentData.patientId,
-      status: 'pending'
-    });
-    
-    // Show toast notification
-    showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
-    
-    // Close the scheduler
-    setSchedulerVisible(false);
+    try {
+      // Use the appointmentStore to add the appointment
+      const newAppointment = await addAppointment({
+        date: appointmentData.date,
+        time: appointmentData.time,
+        reason: appointmentData.reason,
+        notes: appointmentData.notes,
+        patientId: appointmentData.patientId,
+        status: 'pending'
+      });
+      
+      // Show toast notification
+      showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
+      
+      // Close the scheduler
+      setSchedulerVisible(false);
+    } catch (error) {
+      console.error('Failed to schedule appointment:', error);
+      showToast('Failed to schedule appointment. Please try again.', 'error');
+    }
   };
+
+  // If loading
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <Stack.Screen options={{ title: "Patient Details" }} />
+        <View style={styles.loadingContainer}>
+          <Text>Loading patient data...</Text>
+        </View>
+      </ThemedView>
+    );
+  }
 
   // If patient not found
   if (!patient) {
@@ -397,27 +460,103 @@ export default function PatientDetailsScreen() {
           <View style={styles.appointmentsList}>
             <Text style={styles.appointmentListHeader}>Upcoming</Text>
             
-            {getPatientAppointments(patientId)
-              .filter(app => ['confirmed', 'pending'].includes(app.status))
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-              .slice(0, 3)
-              .map((appointment, index) => (
-                <Surface
-                  key={appointment.id}
-                  style={[
-                    styles.appointmentCard,
-                    { backgroundColor: '#FFFFFF' }
-                  ]}
-                  elevation={1}
-                >
-                  <TouchableRipple
-                    rippleColor="rgba(0, 0, 0, 0.1)"
-                    style={{borderRadius: 12}}
-                    onPress={() => router.push(`/appointment/${appointment.id}`)}
+            {appointmentsLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.emptyText}>Loading appointments...</Text>
+              </View>
+            ) : upcomingAppointments.length > 0 ? (
+              upcomingAppointments
+                .slice(0, 3)
+                .map((appointment, index) => (
+                  <Surface
+                    key={appointment.id}
+                    style={[
+                      styles.appointmentCard,
+                      { backgroundColor: '#FFFFFF' }
+                    ]}
+                    elevation={1}
+                  >
+                    <TouchableRipple
+                      rippleColor="rgba(0, 0, 0, 0.1)"
+                      style={{borderRadius: 12}}
+                      onPress={() => router.push(`/appointment/${appointment.id}`)}
+                    >
+                      <View style={styles.appointmentCardContent}>
+                        <View style={[
+                          styles.dateCircle, 
+                          { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                        ]}>
+                          <Text style={[
+                            styles.dateDay,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {new Date(appointment.date).getDate()}
+                          </Text>
+                          <Text style={[
+                            styles.dateMonth,
+                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                          ]}>
+                            {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.appointmentInfo}>
+                          <View style={styles.appointmentMainInfo}>
+                            <Text style={styles.appointmentReason}>{appointment.reason}</Text>
+                            <Text style={styles.appointmentTime}>
+                              <FontAwesome5 
+                                name="clock" 
+                                size={12} 
+                                color="#757575" 
+                                style={{marginRight: 4}}
+                              /> {appointment.time}
+                            </Text>
+                          </View>
+                          
+                          <View style={[
+                            styles.appointmentStatus,
+                            { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                          ]}>
+                            <Text style={[
+                              styles.statusText,
+                              { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                            ]}>
+                              {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableRipple>
+                  </Surface>
+                ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No upcoming appointments</Text>
+              </View>
+            )}
+          </View>
+          
+          <Divider style={styles.sectionDivider} />
+          
+          {/* Past Appointments */}
+          <View style={styles.appointmentsList}>
+            <Text style={styles.appointmentListHeader}>Past Appointments</Text>
+            
+            {pastAppointments.length > 0 ? (
+              pastAppointments
+                .slice(0, 3)
+                .map((appointment, index) => (
+                  <Surface 
+                    key={appointment.id} 
+                    style={[
+                      styles.appointmentCard, 
+                      { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#2196F3' }
+                    ]} 
+                    elevation={2}
                   >
                     <View style={styles.appointmentCardContent}>
                       <View style={[
-                        styles.dateCircle, 
+                        styles.dateIndicator,
                         { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
                       ]}>
                         <Text style={[
@@ -448,171 +587,77 @@ export default function PatientDetailsScreen() {
                         </View>
                         
                         <View style={[
-                          styles.statusChip,
+                          styles.appointmentStatus,
                           { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
                         ]}>
                           <Text style={[
-                            styles.statusChipText,
+                            styles.statusText,
                             { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
                           ]}>
-                            {appointment.status}
+                            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                           </Text>
                         </View>
                       </View>
                     </View>
-                  </TouchableRipple>
-                </Surface>
-              ))
-            }
-            
-            {getPatientAppointments(patientId)
-              .filter(app => ['confirmed', 'pending'].includes(app.status))
-              .length === 0 && (
-              <View style={styles.emptyState}>
-                <FontAwesome5 name="calendar-times" size={24} color="#CCCCCC" />
-                <Text style={styles.emptyStateText}>No upcoming appointments</Text>
-                <Button 
-                  mode="outlined" 
-                  onPress={() => setSchedulerVisible(true)}
-                  style={styles.scheduleEmptyButton}
-                  textColor="#4CAF50"
-                >
-                  Schedule Now
-                </Button>
-              </View>
-            )}
-          </View>
-          
-          <Divider style={styles.sectionDivider} />
-          
-          {/* Past Appointments */}
-          <View style={styles.appointmentsList}>
-            <Text style={styles.appointmentListHeader}>Past Appointments</Text>
-            
-            {getPatientAppointments(patientId)
-              .filter(app => ['completed', 'cancelled'].includes(app.status))
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 3)
-              .map((appointment, index) => (
-                <Surface 
-                  key={appointment.id} 
-                  style={[
-                    styles.appointmentCard, 
-                    { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#2196F3' }
-                  ]} 
-                  elevation={2}
-                >
-                  <View style={styles.appointmentCardContent}>
-                    <View style={[
-                      styles.dateIndicator,
-                      { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
-                    ]}>
-                      <Text style={[
-                        styles.dateDay,
-                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                      ]}>
-                        {new Date(appointment.date).getDate()}
-                      </Text>
-                      <Text style={[
-                        styles.dateMonth,
-                        { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                      ]}>
-                        {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
-                      </Text>
-                    </View>
                     
-                    <View style={styles.appointmentInfo}>
-                      <View style={styles.appointmentMainInfo}>
-                        <Text style={styles.appointmentReason}>{appointment.reason}</Text>
-                        <Text style={styles.appointmentTime}>
-                          <FontAwesome5 
-                            name="clock" 
-                            size={12} 
-                            color="#757575" 
-                            style={{marginRight: 4}}
-                          /> {appointment.time}
-                        </Text>
-                      </View>
-                      
-                      <View style={[
-                        styles.statusChip,
-                        { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
-                      ]}>
-                        <Text style={[
-                          styles.statusChipText,
-                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                        ]}>
-                          {appointment.status}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  
-                  {appointment.status === 'completed' && (
-                    <>
-                      <Divider style={styles.recordDivider} />
-                      <View style={styles.medicalRecordSection}>
-                        <Text style={styles.medicalRecordSectionTitle}>
-                          <FontAwesome5 name="notes-medical" size={12} color={STATUS_COLORS[appointment.status]?.accent || "#2196F3"} style={{marginRight: 6}} />
-                          Medical Record
-                        </Text>
-                        
-                        {appointment.notes ? (
-                          <View style={styles.recordItemsGrid}>
-                            {/* Extract medical record details from notes */}
-                            {(() => {
-                              // Try to parse medical record from appointment notes
-                              const noteLines = appointment.notes.split('\n');
-                              const recordItems = [];
-                              
-                              // Add common items even if not found
-                              const recordMap = {
-                                'Complaint': '',
-                                'Diagnosis': '',
-                                'Blood Pressure': '',
-                                'Prescription': ''
-                              };
-                              
-                              // Extract data from notes
-                              noteLines.forEach(line => {
-                                Object.keys(recordMap).forEach(key => {
-                                  if (line.includes(`${key}:`)) {
-                                    recordMap[key] = line.split(`${key}:`)[1]?.trim() || 'Not recorded';
-                                  }
+                    {appointment.status === 'completed' && (
+                      <>
+                        <Divider style={styles.recordDivider} />
+                        <View style={styles.medicalRecordSection}>
+                          <Text style={styles.medicalRecordSectionTitle}>
+                            <FontAwesome5 name="notes-medical" size={12} color={STATUS_COLORS[appointment.status]?.accent || "#2196F3"} style={{marginRight: 6}} />
+                            Medical Record
+                          </Text>
+                          
+                          {appointment.notes ? (
+                            <View style={styles.recordItemsGrid}>
+                              {/* Extract medical record details from notes */}
+                              {(() => {
+                                // Try to parse medical record from appointment notes
+                                const noteLines = appointment.notes.split('\n');
+                                const recordItems = [];
+                                
+                                // Add common items even if not found
+                                const recordMap = {
+                                  'Complaint': '',
+                                  'Diagnosis': '',
+                                  'Blood Pressure': '',
+                                  'Prescription': ''
+                                };
+                                
+                                // Extract data from notes
+                                noteLines.forEach(line => {
+                                  Object.keys(recordMap).forEach(key => {
+                                    if (line.includes(`${key}:`)) {
+                                      recordMap[key] = line.split(`${key}:`)[1]?.trim() || 'Not recorded';
+                                    }
+                                  });
                                 });
-                              });
-                              
-                              // Create items for display
-                              return Object.entries(recordMap).map(([key, value], idx) => (
-                                <View key={idx} style={styles.recordItem}>
-                                  <Text style={styles.recordItemLabel}>{key}</Text>
-                                  <Text style={styles.recordItemValue}>{value || 'Not recorded'}</Text>
-                                </View>
-                              ));
-                            })()}
-                          </View>
-                        ) : (
-                          <Text style={styles.noRecordsText}>No medical record details available</Text>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </Surface>
-              ))
-            }
-            
-            {getPatientAppointments(patientId)
-              .filter(app => ['completed', 'cancelled'].includes(app.status))
-              .length === 0 && (
+                                
+                                // Create items for display
+                                return Object.entries(recordMap).map(([key, value], idx) => (
+                                  <View key={idx} style={styles.recordItem}>
+                                    <Text style={styles.recordItemLabel}>{key}</Text>
+                                    <Text style={styles.recordItemValue}>{value || 'Not recorded'}</Text>
+                                  </View>
+                                ));
+                              })()}
+                            </View>
+                          ) : (
+                            <Text style={styles.noRecordsText}>No medical record details available</Text>
+                          )}
+                        </View>
+                      </>
+                    )}
+                  </Surface>
+                ))
+            ) : (
               <View style={styles.emptyState}>
-                <FontAwesome5 name="history" size={24} color="#CCCCCC" />
-                <Text style={styles.emptyStateText}>No appointment history</Text>
+                <Text style={styles.emptyText}>No appointment history</Text>
               </View>
             )}
             
-            {getPatientAppointments(patientId)
-              .filter(app => ['completed', 'cancelled'].includes(app.status))
-              .length > 3 && (
+            {pastAppointments.length > 3 && (
               <Button 
                 mode="text" 
                 onPress={() => {
@@ -860,14 +905,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#757575',
   },
-  statusChip: {
+  appointmentStatus: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusChipText: {
+  statusText: {
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'capitalize',
@@ -888,7 +933,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  emptyStateText: {
+  emptyText: {
     marginTop: 8,
     marginBottom: 8,
     fontSize: 14,
@@ -961,5 +1006,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
