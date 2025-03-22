@@ -71,13 +71,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <FontAwesome5 name="cog" size={24} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="debug"
-        options={{
-          title: "Debug",
-          tabBarIcon: ({ color }) => <FontAwesome5 name="bug" size={24} color={color} />,
-        }}
-      />
     </Tabs>
   );
 }
