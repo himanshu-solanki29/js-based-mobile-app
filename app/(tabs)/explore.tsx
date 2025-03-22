@@ -16,7 +16,7 @@ import {
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import usePatientStorage from '@/utils/usePatientStorage';
-import logStorageService from '@/utils/logStorageService';
+import { INITIAL_PATIENTS } from '@/utils/initialData';
 
 // Define appointment type
 type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
@@ -43,24 +43,31 @@ export default function ExploreScreen() {
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
   
-  // Initialize filtered patients on component mount
-  useEffect(() => {
-    setFilteredPatients(patients);
+  // Filter out dummy data regardless of any setting
+  const realPatients = useMemo(() => {
+    // Filter out dummy patients (IDs 1-5)
+    const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+    return patients.filter(patient => !initialPatientIds.includes(patient.id));
   }, [patients]);
+
+  // Initialize filtered patients on component mount and when patients change
+  useEffect(() => {
+    setFilteredPatients(realPatients);
+  }, [realPatients]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(patients);
+      setFilteredPatients(realPatients);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = patients.filter(patient => 
+      const filtered = realPatients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, patients]);
+  }, [searchQuery, realPatients]);
 
   const handleScheduleAppointment = async (appointmentData: {
     date: Date;
@@ -86,26 +93,12 @@ export default function ExploreScreen() {
       // Display success message
       showToast(`Appointment scheduled for ${formatDate(appointment.date)} at ${appointment.time}`, "success");
       
-      // Log the operation
-      logStorageService.addLog({
-        operation: 'CREATE_APPOINTMENT',
-        status: 'success',
-        details: `Scheduled appointment for patient ${appointmentData.patientName} on ${formatDate(appointment.date)} at ${appointment.time}`
-      });
-      
       // Close scheduler dialog
       setSchedulerVisible(false);
       setSelectedPatientId(null);
     } catch (error) {
       console.error("Error scheduling appointment:", error);
       showToast("Error scheduling appointment", "error");
-      
-      // Log the error
-      logStorageService.addLog({
-        operation: 'CREATE_APPOINTMENT',
-        status: 'error',
-        details: `Error scheduling appointment: ${error instanceof Error ? error.message : String(error)}`
-      });
     }
   };
   
@@ -265,6 +258,9 @@ export default function ExploreScreen() {
         <View style={styles.noResultsContainer}>
           <FontAwesome5 name="users" size={48} color="#CCCCCC" />
           <Text style={styles.noResultsText}>No patients found</Text>
+          <Text style={styles.noResultsSubText}>
+            Tap the + button below to add your first patient
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -405,12 +401,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 32,
+    marginTop: 40,
   },
   noResultsText: {
-    marginTop: 12,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 16,
     color: '#2e7d32',
+  },
+  noResultsSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   buttonText: {
     color: "#ffffff",
