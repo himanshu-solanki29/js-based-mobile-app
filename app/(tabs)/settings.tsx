@@ -334,12 +334,29 @@ export default function SettingsScreen() {
       setIsExporting(true);
       showToast('Preparing data for export...', 'info');
       
+      // Export statistics
+      const stats = {
+        patients: {
+          total: 0,
+          exported: 0,
+          skipped: 0
+        },
+        appointments: {
+          total: 0,
+          exported: 0,
+          skipped: 0
+        }
+      };
+      
       // Get all data to export
       const patients = await patientStorageService.getPatients();
       const appointments = await appointmentStorageService.getAppointments();
       
-      console.log('Original patients count:', patients?.length);
-      console.log('Original appointments count:', appointments?.length);
+      stats.patients.total = patients?.length || 0;
+      stats.appointments.total = appointments?.length || 0;
+      
+      console.log('Original patients count:', stats.patients.total);
+      console.log('Original appointments count:', stats.appointments.total);
       
       // Filter out dummy/initial data (IDs 1-5 are typically initial patients)
       const filteredPatients = patients?.filter(patient => {
@@ -349,6 +366,14 @@ export default function SettingsScreen() {
         const isDemoPatient = 
           (idNumber >= 1 && idNumber <= 5) || 
           (patient.email && patient.email.includes('example.com'));
+        
+        // Count skipped patients
+        if (isDemoPatient) {
+          stats.patients.skipped++;
+        } else {
+          stats.patients.exported++;
+        }
+        
         console.log(`Patient ${patient.id} (${patient.name}) is demo: ${isDemoPatient}`);
         return !isDemoPatient;
       }) || [];
@@ -364,13 +389,19 @@ export default function SettingsScreen() {
         // Check if it's a demo appointment based on ID or patient
         const isDemoAppointment = (idNumber >= 1 && idNumber <= 7) || isForDemoPatient;
         
+        // Count skipped appointments
+        if (isDemoAppointment) {
+          stats.appointments.skipped++;
+        } else {
+          stats.appointments.exported++;
+        }
+        
         console.log(`Appointment ${appointment.id} for patient ${appointment.patientId} is demo: ${isDemoAppointment}`);
         
         return !isDemoAppointment;
       }) || [];
       
-      console.log('Filtered patients count:', filteredPatients.length);
-      console.log('Filtered appointments count:', filteredAppointments.length);
+      console.log('Export statistics:', stats);
       
       // Log export activity
       let logDetails = '';
@@ -403,7 +434,8 @@ export default function SettingsScreen() {
         patients: filteredPatients,
         appointments: filteredAppointments,
         exportDate: new Date().toISOString(),
-        appVersion: '1.0.0'
+        appVersion: '1.0.0',
+        stats: stats
       };
       
       // Convert to JSON string
@@ -413,8 +445,38 @@ export default function SettingsScreen() {
       const timestamp = new Date().toISOString().replace(/:/g, '-');
       const filename = `holistic_health_export_${timestamp}.json`;
       
+      // Format export statistics for display
+      const formatExportStats = () => {
+        const totalExported = stats.patients.exported + stats.appointments.exported;
+        const totalItems = stats.patients.total + stats.appointments.total;
+        const totalSkipped = stats.patients.skipped + stats.appointments.skipped;
+        
+        // Build detailed summary
+        let summaryMessage = `Successfully exported ${totalExported} of ${totalItems} items`;
+        
+        // Add detail parts
+        const detailParts = [];
+        if (stats.patients.exported > 0) {
+          detailParts.push(`${stats.patients.exported} patients`);
+        }
+        if (stats.appointments.exported > 0) {
+          detailParts.push(`${stats.appointments.exported} appointments`);
+        }
+        
+        if (detailParts.length > 0) {
+          summaryMessage += ` (${detailParts.join(', ')})`;
+        }
+        
+        // Add skipped items if any
+        if (totalSkipped > 0) {
+          summaryMessage += `. Skipped ${totalSkipped} demo items.`;
+        }
+        
+        return summaryMessage;
+      };
+      
       // Create log details string
-      logDetails = `Exported ${filteredPatients.length} patients and ${filteredAppointments.length} appointments`;
+      logDetails = formatExportStats();
       
       if (Platform.OS === 'web') {
         // For web, download the file directly
@@ -430,7 +492,7 @@ export default function SettingsScreen() {
         document.body.removeChild(element);
         URL.revokeObjectURL(url);
         
-        showToast('Export complete. File downloaded.', 'success');
+        showToast('Export complete. ' + formatExportStats(), 'success');
       } else {
         // For mobile platforms
         try {
@@ -455,7 +517,7 @@ export default function SettingsScreen() {
               UTI: 'public.json'
             });
             
-            showToast('Export complete', 'success');
+            showToast('Export complete. ' + formatExportStats(), 'success');
           } else {
             Alert.alert('Error', 'Sharing is not available on this device');
           }
@@ -1043,20 +1105,40 @@ export default function SettingsScreen() {
       setIsClearing(true);
       showToast('Clearing all data...', 'info');
       
+      // Clear statistics
+      const stats = {
+        totalKeys: 0,
+        removed: 0,
+        preserved: 0
+      };
+      
       // Get all keys in localStorage
       const keysToRemove: string[] = [];
+      const preservedKeys: string[] = [];
       
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         // Browser environment (localStorage)
+        stats.totalKeys = localStorage.length;
+        
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && !key.startsWith('@app_config')) {
-            keysToRemove.push(key);
+          if (key) {
+            if (!key.startsWith('@app_config')) {
+              keysToRemove.push(key);
+            } else {
+              preservedKeys.push(key);
+            }
           }
         }
         
+        stats.removed = keysToRemove.length;
+        stats.preserved = preservedKeys.length;
+        
         // Now remove the collected keys
         console.log('Clearing keys:', keysToRemove);
+        console.log('Preserving keys:', preservedKeys);
+        console.log('Clear statistics:', stats);
+        
         keysToRemove.forEach(key => {
           localStorage.removeItem(key);
         });
@@ -1064,11 +1146,21 @@ export default function SettingsScreen() {
         // Set first launch to false to prevent re-initialization with demo data
         localStorage.setItem('@app_first_launch', 'false');
         
+        // Format clear statistics for display
+        const clearSummary = `Cleared ${stats.removed} data items. Preserved ${stats.preserved} configuration items.`;
+        
         // Show success message before reload
-        showToast('All data cleared successfully', 'success');
+        showToast('All data cleared successfully. ' + clearSummary, 'success');
         
         // Re-initialize the storage with empty data
         await initializeStorage(true); // Pass true to force reset
+        
+        // Log data clear
+        await logStorageService.addLog({
+          operation: 'clear',
+          status: 'success',
+          details: clearSummary
+        });
         
         // Give time for the toast to be seen
         setTimeout(() => {
@@ -1078,11 +1170,18 @@ export default function SettingsScreen() {
       } else {
         // React Native environment (AsyncStorage)
         const allKeys = await AsyncStorage.getAllKeys();
+        stats.totalKeys = allKeys.length;
         
         // Filter out configuration keys that should be preserved
         const keysToRemove = allKeys.filter(key => !key.startsWith('@app_config'));
+        const preservedKeys = allKeys.filter(key => key.startsWith('@app_config'));
+        
+        stats.removed = keysToRemove.length;
+        stats.preserved = preservedKeys.length;
         
         console.log('Clearing keys:', keysToRemove);
+        console.log('Preserving keys:', preservedKeys);
+        console.log('Clear statistics:', stats);
         
         // Remove all data keys
         if (keysToRemove.length > 0) {
@@ -1095,8 +1194,18 @@ export default function SettingsScreen() {
         // Re-initialize storage with empty data
         await initializeStorage(true);
         
+        // Format clear statistics for display
+        const clearSummary = `Cleared ${stats.removed} data items. Preserved ${stats.preserved} configuration items.`;
+        
         // Show success message
-        showToast('All data cleared successfully', 'success');
+        showToast('All data cleared successfully. ' + clearSummary, 'success');
+        
+        // Log data clear
+        await logStorageService.addLog({
+          operation: 'clear',
+          status: 'success',
+          details: clearSummary
+        });
         
         // In a production app, you might want to restart the app or navigate to a login screen
         Alert.alert(
@@ -1105,14 +1214,6 @@ export default function SettingsScreen() {
           [{ text: 'OK' }]
         );
       }
-      
-      // Log data clear
-      await logStorageService.addLog({
-        operation: 'clear',
-        status: 'success',
-        details: 'All data cleared successfully'
-      });
-      
     } catch (error) {
       console.error('Failed to clear data:', error);
       showToast('Failed to clear data: ' + (error.message || 'Unknown error'), 'error');
