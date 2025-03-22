@@ -438,8 +438,32 @@ export default function SettingsScreen() {
         URL.revokeObjectURL(url);
         
         showToast('Export complete. ' + formatExportStats(), 'success');
+      } else if (Platform.OS === 'android') {
+        try {
+          // On Android, use StorageAccessFramework to allow saving to Downloads folder
+          const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+          if (!permissions.granted) {
+            showToast('Permission denied to save file', 'error');
+            setIsExporting(false);
+            return;
+          }
+          
+          // Create and write to file in user-selected directory
+          const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            filename,
+            'application/json'
+          );
+          
+          await FileSystem.StorageAccessFramework.writeAsStringAsync(fileUri, jsonData);
+          
+          showToast('Export complete. ' + formatExportStats(), 'success');
+        } catch (fsError) {
+          console.error('Android file save error:', fsError);
+          showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
+        }
       } else {
-        // For mobile platforms
+        // For iOS platforms
         try {
           // Create export directory if it doesn't exist
           const exportDir = `${FileSystem.documentDirectory}exports/`;
@@ -467,7 +491,7 @@ export default function SettingsScreen() {
             Alert.alert('Error', 'Sharing is not available on this device');
           }
         } catch (fsError) {
-          console.error('FileSystem or Sharing error:', fsError);
+          console.error('iOS file save error:', fsError);
           showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
         }
       }
