@@ -12,7 +12,7 @@ const APPOINTMENT_STORAGE_KEY = 'appointments_data';
 class AppointmentStorageService extends StorageService<Appointment[]> {
   private appointments: Appointment[];
   private listeners: (() => void)[] = [];
-  private initialized: boolean = false;
+  public initialized: boolean = false;
   
   constructor() {
     super(APPOINTMENT_STORAGE_KEY);

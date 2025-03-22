@@ -25,7 +25,7 @@ const PATIENT_STORAGE_KEY = 'patients_data';
 class PatientStorageService extends StorageService<PatientsData> {
   private patients: PatientsData;
   private listeners: (() => void)[] = [];
-  private initialized: boolean = false;
+  public initialized: boolean = false;
   
   constructor() {
     super(PATIENT_STORAGE_KEY);

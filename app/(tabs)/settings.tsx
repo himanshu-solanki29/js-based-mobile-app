@@ -903,25 +903,32 @@ export default function SettingsScreen() {
       setIsClearing(true);
       showToast('Clearing all data...', 'info');
       
-      // Clear all storage
+      // Get all keys in localStorage
+      const keysToRemove: string[] = [];
+      
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        // For web platform
+        // Browser environment (localStorage)
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          // Skip app configuration keys that should be preserved
           if (key && !key.startsWith('@app_config')) {
-            localStorage.removeItem(key);
+            keysToRemove.push(key);
           }
         }
+        
+        // Now remove the collected keys
+        console.log('Clearing keys:', keysToRemove);
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+        });
         
         // Set first launch to false to prevent re-initialization with demo data
         localStorage.setItem('@app_first_launch', 'false');
         
         // Show success message before reload
-        showToast('All data cleared successfully. Reloading app...', 'success');
+        showToast('All data cleared successfully', 'success');
         
-        // Re-initialize storage with empty data
-        await initializeStorage(true);
+        // Re-initialize the storage with empty data
+        await initializeStorage(true); // Pass true to force reset
         
         // Give time for the toast to be seen
         setTimeout(() => {
@@ -929,12 +936,13 @@ export default function SettingsScreen() {
           window.location.reload();
         }, 1500);
       } else {
-        // For native platforms
-        // Get all keys
+        // React Native environment (AsyncStorage)
         const allKeys = await AsyncStorage.getAllKeys();
         
         // Filter out configuration keys that should be preserved
         const keysToRemove = allKeys.filter(key => !key.startsWith('@app_config'));
+        
+        console.log('Clearing keys:', keysToRemove);
         
         // Remove all data keys
         if (keysToRemove.length > 0) {
@@ -948,10 +956,9 @@ export default function SettingsScreen() {
         await initializeStorage(true);
         
         // Show success message
-        showToast('All data has been cleared successfully', 'success');
+        showToast('All data cleared successfully', 'success');
         
         // In a production app, you might want to restart the app or navigate to a login screen
-        // For now, we'll just show a success message
         Alert.alert(
           'Data Cleared',
           'All data has been cleared successfully. Please restart the app for changes to take effect.',
@@ -959,7 +966,7 @@ export default function SettingsScreen() {
         );
       }
     } catch (error) {
-      console.error('Error clearing data:', error);
+      console.error('Failed to clear data:', error);
       showToast('Failed to clear data: ' + (error.message || 'Unknown error'), 'error');
     } finally {
       setIsClearing(false);
