@@ -607,15 +607,6 @@ export default function AppointmentDetailsScreen() {
       {/* Fixed Footer for Actions */}
       <SafeAreaView style={styles.footerContainer}>
         <View style={styles.footerContent}>
-          <Button 
-            mode="outlined"
-            icon={() => <FontAwesome5 name="arrow-left" size={16} color="#757575" />}
-            style={styles.cancelButton}
-            textColor="#757575"
-            onPress={() => router.back()}
-          >
-            Back
-          </Button>
           
           {/* Only show pending actions if the appointment is pending */}
           {appointment?.status === 'pending' && !actionInProgress && (
@@ -995,7 +986,7 @@ const styles = StyleSheet.create({
   },
   footerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   cancelButton: {
@@ -1009,9 +1000,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonGroup: {
-    flex: 2,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
   },
   cancelAppointmentButton: {
     flex: 1,
