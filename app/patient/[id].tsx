@@ -1,139 +1,307 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, View, TextInput, ScrollView, Alert, SafeAreaView, Platform } from 'react-native';
-import { useGlobalToast } from '@/components/GlobalToastProvider';
-import { Colors } from '@/constants/Colors';
-import { useLocalSearchParams, Link, Stack, useRouter } from 'expo-router';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from "react-native";
+import { Colors } from "@/constants/Colors";
+import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
+import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { formatDate } from '@/utils/dateFormat';
-import { usePatientStorage, getAgeFromBirthdate } from '@/utils/usePatientStorage';
-import { useAppointmentStorage } from '@/utils/useAppointmentStorage';
-import { Appointment } from '@/utils/appointmentStore';
-import { Patient } from '@/utils/patientStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StatusBar } from 'expo-status-bar';
-import { Button, IconButton, Avatar, Card, Title, Paragraph, Divider, Badge, ActivityIndicator, FAB, Menu, Portal, Dialog, TextInput as PaperTextInput, useTheme } from 'react-native-paper';
-import { ContactInfoFields, updateContactInfo } from '@/components/ContactInfoFields';
-import { MedicalHistoryFields, updateMedicalHistory } from '@/components/MedicalHistoryFields';
-import PatientAppointmentCard from '@/components/PatientAppointmentCard';
-import { logStorageService } from '@/utils/logStorageService';
+import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme, Appbar } from 'react-native-paper';
+import { useState, useEffect } from "react";
+import React from 'react';
 
-export default function PatientDetailScreen() {
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import { 
+  getPatientById,
+  usePatients
+} from "@/utils/patientStore";
+import { AppointmentScheduler } from "@/components/AppointmentScheduler";
+import { 
+  getPatientAppointments,
+  addAppointment, 
+  Appointment,
+  useAppointments
+} from '@/utils/appointmentStore';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
+import { globalEventEmitter } from '@/utils/dummyDataService';
+
+// Mock appointment data used across the app
+// In a real app this would be in a central store/context
+const MOCK_APPOINTMENTS = [
+  {
+    id: '1',
+    patientId: '1',
+    patientName: 'John Doe',
+    date: '2023-06-15',
+    time: '09:30 AM',
+    reason: 'Follow-up',
+    status: 'confirmed',
+  },
+  // More appointments would be here
+];
+
+// Define types for visits and patient data
+type Visit = {
+  date: string;    // Date from completed appointment
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+};
+
+// Note: In a production app, visits would be generated from completed appointments
+
+type Patient = {
+  id: string;
+  name: string;
+  age: number;
+  gender: string;
+  phone: string;
+  email: string;
+  height: string;
+  weight: string;
+  bloodPressure: string;
+  medicalHistory: string;
+  visits: Visit[];
+};
+
+type PatientsData = {
+  [key: string]: Patient;
+};
+
+// Mock data for patient visits and details
+const MOCK_PATIENTS: PatientsData = {
+  "1": {
+    id: "1",
+    name: "John Doe",
+    age: 42,
+    gender: "Male",
+    phone: "555-1234",
+    email: "john.doe@example.com",
+    height: "175 cm",
+    weight: "78 kg",
+    bloodPressure: "120/80",
+    medicalHistory: "Hypertension, Seasonal allergies",
+    visits: [
+      {
+        date: "2023-03-10",
+        complaint: "Persistent cough",
+        diagnosis: "Bronchitis",
+        bloodPressure: "126/82",
+        weight: "78 kg",
+        prescription: "Amoxicillin 500mg, twice daily for 7 days"
+      },
+      {
+        date: "2023-02-15",
+        complaint: "Headache, fatigue",
+        diagnosis: "Migraine",
+        bloodPressure: "130/85",
+        weight: "79 kg",
+        prescription: "Sumatriptan 50mg as needed, Propranolol 40mg daily"
+      }
+    ]
+  },
+  "2": {
+    id: "2",
+    name: "Jane Smith",
+    age: 35,
+    gender: "Female",
+    phone: "555-2345",
+    email: "jane.smith@example.com",
+    height: "165 cm",
+    weight: "62 kg",
+    bloodPressure: "118/75",
+    medicalHistory: "Asthma",
+    visits: [
+      {
+        date: "2023-03-15",
+        complaint: "Shortness of breath",
+        diagnosis: "Asthma exacerbation",
+        bloodPressure: "120/78",
+        weight: "62 kg",
+        prescription: "Albuterol inhaler, Prednisone 40mg daily for 5 days"
+      }
+    ]
+  }
+};
+
+// Add MedicalRecord interface definition directly in the file
+// Define the MedicalRecord interface locally
+interface MedicalRecord {
+  complaint: string;
+  diagnosis: string;
+  bloodPressure: string;
+  weight: string;
+  prescription: string;
+}
+
+// Define status colors for consistent styling
+const STATUS_COLORS = {
+  confirmed: {
+    bg: '#E8F5E9',
+    text: '#2E7D32',
+    accent: '#4CAF50'
+  },
+  pending: {
+    bg: '#FFF3E0',
+    text: '#E65100',
+    accent: '#FF9800'
+  },
+  completed: {
+    bg: '#E3F2FD',
+    text: '#0D47A1',
+    accent: '#2196F3'
+  },
+  cancelled: {
+    bg: '#FFEBEE',
+    text: '#B71C1C',
+    accent: '#F44336'
+  }
+};
+
+export default function PatientDetailsScreen() {
   const params = useLocalSearchParams();
   const id = params.id as string;
   const router = useRouter();
-  const theme = useTheme();
   const { showToast } = useGlobalToast();
+  const theme = useTheme();
   
-  const [editMode, setEditMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'notes' | 'edit'>('overview');
-  const [newNote, setNewNote] = useState<string>('');
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isShowingScheduler, setIsShowingScheduler] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  
-  // Get patient details
-  const { patients, loading: patientsLoading, error: patientsError, updatePatient, deletePatient } = usePatientStorage();
-  const { appointments, loading: appointmentsLoading, error: appointmentsError } = useAppointmentStorage();
-  
-  // Find the patient
-  const patient = patients.find(p => p.id === id);
-  
-  // Filter appointments for this patient
-  const patientAppointments = appointments.filter(appointment => appointment.patientId === id);
-  
-  // Sort appointments by date (most recent first)
-  const sortedAppointments = [...patientAppointments].sort((a, b) => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
-    return dateB.getTime() - dateA.getTime();
-  });
-  
-  const [editedPatient, setEditedPatient] = useState<Patient | null>(null);
-  
-  // Initialize edited patient when patient data is available
+
+  // Listen for dummy data changes
   useEffect(() => {
-    if (patient) {
-      setEditedPatient({...patient});
-    }
-  }, [patient]);
+    // Define the refresh handler
+    const handleDummyDataChange = () => {
+      console.log('PatientDetailsScreen: Refreshing after dummy data change');
+      // Force a refresh
+      setRefreshTrigger(prev => prev + 1);
+    };
+    
+    // Add event listener
+    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    
+    // Remove event listener on cleanup
+    return () => {
+      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    };
+  }, []);
   
-  // If patient not found
-  if (!patientsLoading && !patient) {
+  // Load patient data
+  useEffect(() => {
+    const loadPatient = async () => {
+      try {
+        setIsLoading(true);
+        console.log('Loading patient with ID:', id);
+        
+        // Get the patient
+        const patientData = await getPatientById(id);
+        if (!patientData) {
+          console.error('Patient not found:', id);
+          showToast('Patient not found', 'error');
+          router.back();
+          return;
+        }
+        
+        setPatient(patientData);
+        
+        // Get patient appointments
+        const appointments = await getPatientAppointments(id);
+        setPatientAppointments(appointments);
+        
+      } catch (error) {
+        console.error('Error loading patient:', error);
+        showToast('Error loading patient data', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadPatient();
+  }, [id, refreshTrigger]); // Add refreshTrigger as a dependency
+  
+  // Filter upcoming appointments
+  const upcomingAppointments = React.useMemo(() => {
+    return patientAppointments
+      .filter(app => ['confirmed', 'pending'].includes(app.status))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [patientAppointments]);
+  
+  // Filter past appointments
+  const pastAppointments = React.useMemo(() => {
+    return patientAppointments
+      .filter(app => ['completed', 'cancelled'].includes(app.status))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [patientAppointments]);
+
+  const handleScheduleAppointment = async (appointmentData: {
+    date: Date;
+    time: string;
+    reason: string;
+    notes: string;
+    patientId: string;
+    patientName: string;
+  }) => {
+    try {
+      // Use the appointmentStore to add the appointment
+      const newAppointment = await addAppointment({
+        date: appointmentData.date,
+        time: appointmentData.time,
+        reason: appointmentData.reason,
+        notes: appointmentData.notes,
+        patientId: appointmentData.patientId,
+        status: 'pending'
+      });
+      
+      // Show toast notification
+      showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
+      
+      // Close the scheduler
+      setIsShowingScheduler(false);
+    } catch (error) {
+      console.error('Failed to schedule appointment:', error);
+      showToast('Failed to schedule appointment. Please try again.', 'error');
+    }
+  };
+
+  // If loading
+  if (isLoading) {
     return (
-      <ThemedView style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>Patient not found</ThemedText>
-        <Button 
-          mode="contained"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          Go Back
-        </Button>
+      <ThemedView style={styles.container}>
+        <Stack.Screen options={{ title: "Patient Details" }} />
+        <View style={styles.loadingContainer}>
+          <Text>Loading patient data...</Text>
+        </View>
       </ThemedView>
     );
   }
-  
-  // Handle saving patient edits
-  const handleSavePatient = async () => {
-    if (editedPatient) {
-      try {
-        await updatePatient(editedPatient);
-        showToast('Patient information updated successfully', 'success');
-        setEditMode(false);
-        setActiveTab('overview');
-        
-        // Log the operation
-        logStorageService.addLog({
-          operation: 'UPDATE_PATIENT',
-          status: 'success',
-          details: `Updated patient: ${editedPatient.firstName} ${editedPatient.lastName} (ID: ${editedPatient.id})`
-        });
-      } catch (error) {
-        console.error('Error updating patient:', error);
-        showToast('Failed to update patient information', 'error');
-        
-        // Log the error
-        logStorageService.addLog({
-          operation: 'UPDATE_PATIENT',
-          status: 'error',
-          details: `Error updating patient: ${error instanceof Error ? error.message : String(error)}`
-        });
-      }
-    }
-  };
-  
-  // Handle deleting a patient
-  const handleDeletePatient = async () => {
-    if (patient) {
-      try {
-        await deletePatient(patient.id);
-        showToast('Patient deleted successfully', 'success');
-        
-        // Log the operation
-        logStorageService.addLog({
-          operation: 'DELETE_PATIENT',
-          status: 'success',
-          details: `Deleted patient: ${patient.firstName} ${patient.lastName} (ID: ${patient.id})`
-        });
-        
-        // Navigate back
-        router.back();
-      } catch (error) {
-        console.error('Error deleting patient:', error);
-        showToast('Failed to delete patient', 'error');
-        
-        // Log the error
-        logStorageService.addLog({
-          operation: 'DELETE_PATIENT',
-          status: 'error',
-          details: `Error deleting patient: ${error instanceof Error ? error.message : String(error)}`
-        });
-      }
-    }
-    setDeleteDialogVisible(false);
-  };
+
+  // If patient not found
+  if (!patient) {
+    return (
+      <ThemedView style={styles.container}>
+        <Stack.Screen options={{ title: "Patient Details" }} />
+        <View style={styles.notFoundContainer}>
+          <FontAwesome5 name="user-slash" size={48} color="#9E9E9E" style={{ marginBottom: 16 }} />
+          <ThemedText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>Patient not found</ThemedText>
+          <ThemedText style={{ textAlign: 'center', color: '#666' }}>
+            The patient you're looking for doesn't exist or has been removed.
+          </ThemedText>
+          <Button 
+            mode="contained" 
+            onPress={() => router.replace("/(tabs)/explore")}
+            style={{ marginTop: 24, borderRadius: 8 }}
+            buttonColor="#757575"
+            textColor="#ffffff"
+          >
+            Back to Patients List
+          </Button>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -321,8 +489,8 @@ export default function PatientDetailScreen() {
           <View style={styles.appointmentsList}>
             <Text style={styles.appointmentListHeader}>Upcoming</Text>
             
-            {sortedAppointments.length > 0 ? (
-              sortedAppointments
+            {upcomingAppointments.length > 0 ? (
+              upcomingAppointments
                 .slice(0, 3)
                 .map((appointment, index) => (
                   <Surface
@@ -399,8 +567,8 @@ export default function PatientDetailScreen() {
           <View style={styles.appointmentsList}>
             <Text style={styles.appointmentListHeader}>Past Appointments</Text>
             
-            {sortedAppointments.length > 0 ? (
-              sortedAppointments
+            {pastAppointments.length > 0 ? (
+              pastAppointments
                 .slice(0, 3)
                 .map((appointment, index) => (
                   <Surface 
@@ -514,7 +682,7 @@ export default function PatientDetailScreen() {
               </View>
             )}
             
-            {sortedAppointments.length > 3 && (
+            {pastAppointments.length > 3 && (
               <Button 
                 mode="text" 
                 onPress={() => {
@@ -868,21 +1036,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    marginBottom: 20,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#B71C1C',
-  },
-  backButton: {
-    borderColor: '#4CAF50',
-    borderRadius: 8,
   },
 });

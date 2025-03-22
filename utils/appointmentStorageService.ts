@@ -2,6 +2,9 @@ import StorageService from './storageService';
 import type { Appointment, AppointmentStatus } from './appointmentStore';
 import patientStorageService from './patientStorageService';
 
+// Import only the data, not importing from appointmentStore to avoid circular dependency
+import { INITIAL_APPOINTMENTS } from './initialData';
+
 // Storage keys
 const APPOINTMENT_STORAGE_KEY = 'appointments_data';
 
@@ -19,7 +22,7 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     });
   }
   
-  // Initialize the storage with empty data if needed
+  // Initialize the storage with default data if empty
   async initialize() {
     if (this.initialized) return;
     
@@ -29,7 +32,7 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
       if (storedData && storedData.length > 0) {
         this.appointments = storedData;
       } else {
-        // Initialize with empty data
+        // Initialize with empty data, not dummy data
         this.appointments = [];
         await this.saveData(this.appointments);
       }
@@ -320,12 +323,12 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     return appointment;
   }
   
-  // Reset storage to empty state
+  // Reset storage to initial state
   async reset(): Promise<void> {
     try {
-      console.log('Resetting appointment storage to empty state');
-      // Reset to empty data
-      this.appointments = [];
+      console.log('Resetting appointment storage to initial state');
+      // Reset to initial data
+      this.appointments = INITIAL_APPOINTMENTS.slice();
       // Save to storage
       await this.saveData(this.appointments);
       // Notify listeners

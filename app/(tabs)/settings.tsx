@@ -1,73 +1,248 @@
-import { StyleSheet, View, Platform, Alert, ScrollView, Modal, TouchableWithoutFeedback, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
-import { ThemedText } from '@/components/ThemedText';
+import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
-import { 
-  Button, 
-  Switch, 
-  Divider, 
-  Card, 
-  Title, 
-  Paragraph, 
-  Surface, 
-  TouchableRipple,
-  Avatar,
-  Text,
-  IconButton,
-  Menu,
-  Dialog,
-  Portal,
-  List,
-  TextInput,
-  Chip,
-  Modal as PaperModal
-} from 'react-native-paper';
+import { ThemedText } from '@/components/ThemedText';
+import { useState, useEffect } from 'react';
+import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph, Menu, IconButton } from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as DocumentPicker from 'expo-document-picker';
+import { getPatientsArray } from '@/utils/patientStore';
+import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useGlobalToast } from '@/components/GlobalToastProvider';
 import patientStorageService from '@/utils/patientStorageService';
 import appointmentStorageService from '@/utils/appointmentStorageService';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { Patient } from '@/utils/patientStore';
-import { Appointment } from '@/utils/appointmentStore';
 import { initializeStorage } from '@/utils/initializeStorage';
-import * as DocumentPicker from 'expo-document-picker';
-import { formatDate } from '@/utils/dateFormat';
-import logStorageService, { LogEntry } from '@/utils/logStorageService';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
+import type { ToastType } from '@/components/Toast';
+import StorageService from '@/utils/storageService';
+import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS } from '@/utils/initialData';
 
-// Define ToastType
-type ToastType = 'success' | 'error' | 'info' | 'warning';
+// Log storage service
+const LOG_STORAGE_KEY = 'operation_logs';
 
-// Helper function to parse CSV
-const parseCSV = (csvString: string, delimiter = ','): any[] => {
+// Log entry type
+type LogEntry = {
+  id: string;
+  timestamp: string;
+  operation: 'import' | 'export' | 'clear';
+  status: 'success' | 'error' | 'warning';
+  details: string;
+};
+
+// Log storage service
+class LogStorageService extends StorageService<LogEntry[]> {
+  private logs: LogEntry[] = [];
+  
+  constructor() {
+    super(LOG_STORAGE_KEY);
+    this.loadLogs().catch(err => {
+      console.error('Failed to load logs:', err);
+    });
+  }
+  
+  async loadLogs() {
+    const storedLogs = await this.getData();
+    this.logs = storedLogs || [];
+  }
+  
+  async getLogs(): Promise<LogEntry[]> {
+    if (this.logs.length === 0) {
+      await this.loadLogs();
+    }
+    return [...this.logs];
+  }
+  
+  async addLog(entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
+    // Create a new log entry with id and timestamp
+    const newLog: LogEntry = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      ...entry
+    };
+    
+    // Add to local logs
+    this.logs = [newLog, ...this.logs].slice(0, 100); // Keep only last 100 logs
+    
+    // Save to storage
+    await this.saveData(this.logs);
+  }
+  
+  async clearLogs(): Promise<void> {
+    this.logs = [];
+    await this.saveData(this.logs);
+  }
+}
+
+// Create an instance of the log service
+const logStorageService = new LogStorageService();
+
+// Helper function to convert JSON to CSV string
+const jsonToCSV = (jsonData) => {
   try {
-    const rows = csvString.split(/\r?\n/).filter(Boolean);
-    if (rows.length === 0) {
-      console.log('CSV is empty or has no valid rows');
+    if (!jsonData || !Array.isArray(jsonData) || jsonData.length === 0) {
+      console.warn('Invalid or empty data passed to jsonToCSV');
+      return '';
+    }
+    
+    // Get headers from keys of first object
+    const headers = Object.keys(jsonData[0]);
+    if (headers.length === 0) {
+      console.warn('Object has no properties');
+      return '';
+    }
+    
+    console.log('CSV headers:', headers);
+    
+    // Create CSV header row
+    const csvRows = [
+      headers.map(header => `"${header.replace(/"/g, '""')}"`).join(',')
+    ];
+    
+    // Add data rows
+    for (const item of jsonData) {
+      try {
+        const values = headers.map(header => {
+          try {
+            const value = item[header];
+            let cellValue;
+            
+            // Handle different types of values
+            if (value === null || value === undefined) {
+              cellValue = '';
+            } else if (Array.isArray(value)) {
+              // Convert arrays to JSON strings
+              cellValue = JSON.stringify(value).replace(/"/g, '""');
+            } else if (typeof value === 'object') {
+              // Convert objects to JSON strings
+              cellValue = JSON.stringify(value).replace(/"/g, '""');
+            } else {
+              // Use simple string conversion for primitives
+              cellValue = String(value);
+            }
+            
+            // Escape quotes and wrap in quotes
+            return `"${cellValue.replace(/"/g, '""')}"`;
+          } catch (fieldError) {
+            console.error(`Error processing field ${header}:`, fieldError);
+            return '""'; // Return empty value on error
+          }
+        });
+        
+        csvRows.push(values.join(','));
+      } catch (rowError) {
+        console.error('Error processing row:', rowError, 'Row data:', item);
+        // Continue to next row
+      }
+    }
+    
+    // Return CSV string
+    const result = csvRows.join('\n');
+    console.log(`CSV generated successfully with ${csvRows.length - 1} data rows`);
+    return result;
+  } catch (error) {
+    console.error('Error generating CSV:', error);
+    return '';
+  }
+};
+
+// Helper function to parse CSV string back to JSON
+const csvToJSON = (csvString) => {
+  try {
+    console.log('CSV to JSON input length:', csvString.length);
+    
+    const lines = csvString.split('\n');
+    if (lines.length <= 1) {
+      console.warn('CSV has insufficient lines:', lines.length);
       return [];
     }
     
-    // Parse headers (first row)
-    const headers = rows[0].split(delimiter).map(header => header.trim());
+    // Get headers from first line
+    // Try to handle quoted headers with commas inside
+    const headers = [];
+    let currentHeader = '';
+    let inQuotes = false;
     
-    // Process rows into objects
-    const result = [];
-    for (let i = 1; i < rows.length; i++) {
-      const values = rows[i].split(delimiter);
+    for (let i = 0; i < lines[0].length; i++) {
+      const char = lines[0][i];
       
-      // Skip rows with different number of columns than headers
+      if (char === '"') {
+        if (inQuotes && i + 1 < lines[0].length && lines[0][i + 1] === '"') {
+          // Double quotes inside quotes are escaped quotes
+          currentHeader += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        headers.push(currentHeader.trim());
+        currentHeader = '';
+      } else {
+        currentHeader += char;
+      }
+    }
+    
+    // Add the last header
+    if (currentHeader.trim()) {
+      headers.push(currentHeader.trim());
+    }
+    
+    // Remove quotes from headers if they exist
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].startsWith('"') && headers[i].endsWith('"')) {
+        headers[i] = headers[i].substring(1, headers[i].length - 1).replace(/""/g, '"');
+      }
+    }
+    
+    console.log('CSV headers:', headers);
+    
+    const result = [];
+    
+    // Process data rows
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) {
+        // Skip empty lines
+        continue;
+      }
+      
+      // Parse the line using state machine to handle quoted fields with commas
+      const values = [];
+      let currentValue = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < lines[i].length; j++) {
+        const char = lines[i][j];
+        
+        if (char === '"') {
+          if (inQuotes && j + 1 < lines[i].length && lines[i][j + 1] === '"') {
+            // Double quotes inside quotes are escaped quotes
+            currentValue += '"';
+            j++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          values.push(currentValue);
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+      
+      // Add the last value
+      values.push(currentValue);
+      
+      // Create object from headers and values
       if (values.length === headers.length) {
         const obj = {};
         
-        // Map values to headers
         for (let j = 0; j < headers.length; j++) {
           try {
-            let value = values[j].trim();
+            let value = values[j];
             
-            // Handle quoted values
+            // Remove surrounding quotes if present
             if (value.startsWith('"') && value.endsWith('"')) {
-              value = value.substring(1, value.length - 1);
+              value = value.substring(1, value.length - 1).replace(/""/g, '"');
             }
             
             // Try to parse JSON objects and arrays
@@ -102,59 +277,74 @@ const parseCSV = (csvString: string, delimiter = ','): any[] => {
   }
 };
 
-// Helper function for CSV to JSON conversion
-const csvToJSON = parseCSV;
-
 export default function SettingsScreen() {
   const { showToast } = useGlobalToast();
-  const [isClearing, setIsClearing] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [isDataClearing, setIsDataClearing] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState(false);
   const [dataSync, setDataSync] = useState(true);
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
-  
-  // Add state for menu and modals
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [exportResults, setExportResults] = useState<any>(null);
+  const [importResults, setImportResults] = useState<any>(null);
+  const [showExportResults, setShowExportResults] = useState(false);
+  const [showImportResults, setShowImportResults] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [showLogMenu, setShowLogMenu] = useState(false);
+
+  // Load logs
+  const loadLogs = async () => {
+    try {
+      const logs = await logStorageService.getLogs();
+      setLogs(logs);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    }
+  };
+
+  // Load settings on component mount
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      document.title = 'Settings - Health Manager';
+    }
+    
+    loadLogs();
+  }, []);
 
   const toggleSwitch = async (setting: string, value: boolean) => {
     try {
-      let storageKey: string;
-      
-      // Handle different settings
       switch (setting) {
         case 'darkMode':
           setDarkMode(value);
-          storageKey = '@app_config_dark_mode';
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            localStorage.setItem('@app_config_dark_mode', value ? 'true' : 'false');
+          } else {
+            await AsyncStorage.setItem('@app_config_dark_mode', value ? 'true' : 'false');
+          }
+          // Show toast
+          showToast(`Dark mode ${value ? 'enabled' : 'disabled'}`, 'success');
           break;
+          
         case 'notifications':
           setNotifications(value);
-          storageKey = '@app_config_notifications';
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            localStorage.setItem('@app_config_notifications', value ? 'true' : 'false');
+          } else {
+            await AsyncStorage.setItem('@app_config_notifications', value ? 'true' : 'false');
+          }
+          // Show toast
+          showToast(`Notifications ${value ? 'enabled' : 'disabled'}`, 'success');
           break;
-        default:
-          return;
       }
-      
-      // Store setting
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        localStorage.setItem(storageKey, JSON.stringify(value));
-      } else {
-        await AsyncStorage.setItem(storageKey, JSON.stringify(value));
-      }
-      
-      // Show toast
-      showToast(`${setting} ${value ? 'enabled' : 'disabled'}`, 'success');
     } catch (error) {
-      console.error('Error toggling switch:', error);
-      showToast('Error saving setting', 'error');
+      console.error(`Error toggling ${setting}:`, error);
+      showToast(`Failed to update setting`, 'error');
     }
   };
 
@@ -169,8 +359,20 @@ export default function SettingsScreen() {
       // Get all appointments
       const appointments = await appointmentStorageService.getAppointments();
       
-      // Check if there's any data to export
-      if (patients.length === 0 && appointments.length === 0) {
+      // Always filter out dummy data
+      // Filter out dummy patients (IDs 1-5)
+      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+      const filteredPatients = patients.filter(patient => !initialPatientIds.includes(patient.id));
+      
+      // Filter out dummy appointments (IDs 1-7)
+      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+      const filteredAppointments = appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+      
+      console.log(`Filtered out ${patients.length - filteredPatients.length} dummy patients`);
+      console.log(`Filtered out ${appointments.length - filteredAppointments.length} dummy appointments`);
+      
+      // Check if there's any data to export after filtering
+      if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
         showToast('No data to export', 'warning');
         
         // Add log entry for the failed export
@@ -184,11 +386,12 @@ export default function SettingsScreen() {
         return;
       }
       
-      // Create export data object
+      // Consolidate data for export
       const exportData = {
-        patients: patients,
-        appointments: appointments,
-        exportDate: new Date().toISOString()
+        patients: filteredPatients,
+        appointments: filteredAppointments,
+        exportDate: new Date().toISOString(),
+        version: '1.0'
       };
       
       // Convert to JSON string
@@ -200,18 +403,19 @@ export default function SettingsScreen() {
       
       // Format export statistics for display
       const formatExportStats = () => {
-        const totalExported = patients.length + appointments.length;
+        const totalExported = filteredPatients.length + filteredAppointments.length;
+        const totalItems = patients.length + appointments.length;
         
         // Build detailed summary
-        let summaryMessage = `Successfully exported ${totalExported} items`;
+        let summaryMessage = `Exported ${totalExported} items`;
         
         // Add detail parts
         const detailParts = [];
-        if (patients.length > 0) {
-          detailParts.push(`${patients.length} patients`);
+        if (filteredPatients.length > 0) {
+          detailParts.push(`${filteredPatients.length} patients`);
         }
-        if (appointments.length > 0) {
-          detailParts.push(`${appointments.length} appointments`);
+        if (filteredAppointments.length > 0) {
+          detailParts.push(`${filteredAppointments.length} appointments`);
         }
         
         if (detailParts.length > 0) {
@@ -437,6 +641,12 @@ export default function SettingsScreen() {
         showToast('Invalid data format: missing patients or appointments data', 'error');
         setIsImporting(false);
         return;
+      }
+      
+      // Process settings from imported data
+      if (importedData.version && typeof importedData.version === 'string') {
+        console.log('Import version:', importedData.version);
+        // We don't need to process any settings anymore
       }
       
       // Import patients if available
@@ -810,12 +1020,12 @@ export default function SettingsScreen() {
 
   const clearAllData = async () => {
     console.log('clearAllData function called - showing export modal');
-    setShowExportModal(true);
+    setShowExportDialog(true);
   };
 
   const handleExportChoice = async (shouldExport) => {
     console.log('Export choice:', shouldExport);
-    setShowExportModal(false);
+    setShowExportDialog(false);
     
     if (shouldExport) {
       try {
@@ -823,7 +1033,7 @@ export default function SettingsScreen() {
         await exportPatientData();
         // Then ask for final confirmation to clear data
         setTimeout(() => {
-          setShowConfirmClearModal(true);
+          setShowClearConfirm(true);
         }, 500); // Add small delay to ensure first modal is closed
       } catch (error) {
         console.error('Error during export:', error);
@@ -832,14 +1042,14 @@ export default function SettingsScreen() {
     } else {
       // Directly show confirm clear modal
       setTimeout(() => {
-        setShowConfirmClearModal(true);
+        setShowClearConfirm(true);
       }, 500); // Add small delay to ensure first modal is closed
     }
   };
 
   const handleConfirmClear = (confirmed) => {
     console.log('Clear data confirmation:', confirmed);
-    setShowConfirmClearModal(false);
+    setShowClearConfirm(false);
     
     if (confirmed) {
       executeDataClear();
@@ -848,7 +1058,7 @@ export default function SettingsScreen() {
 
   const executeDataClear = async () => {
     try {
-      setIsClearing(true);
+      setIsDataClearing(true);
       showToast('Clearing all data...', 'info');
       
       // Clear statistics
@@ -971,24 +1181,13 @@ export default function SettingsScreen() {
         details: `Data clear failed: ${error.message || 'Unknown error'}`
       });
     } finally {
-      setIsClearing(false);
+      setIsDataClearing(false);
     }
   };
 
   const viewLogs = async () => {
-    setMenuVisible(false);
-    setIsLoadingLogs(true);
-    
-    try {
-      const operationLogs = await logStorageService.getLogs();
-      setLogs(operationLogs);
-      setShowLogsModal(true);
-    } catch (error) {
-      console.error('Error loading logs:', error);
-      showToast('Failed to load logs', 'error');
-    } finally {
-      setIsLoadingLogs(false);
-    }
+    setShowLogMenu(false);
+    setShowLogs(true);
   };
   
   const clearLogs = async () => {
@@ -1000,6 +1199,12 @@ export default function SettingsScreen() {
       console.error('Error clearing logs:', error);
       showToast('Failed to clear logs', 'error');
     }
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
   };
 
   return (
@@ -1110,13 +1315,13 @@ export default function SettingsScreen() {
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
             <Menu
-              visible={menuVisible}
-              onDismiss={() => setMenuVisible(false)}
+              visible={showLogMenu}
+              onDismiss={() => setShowLogMenu(false)}
               anchor={
                 <IconButton
                   icon="dots-vertical"
                   size={20}
-                  onPress={() => setMenuVisible(true)}
+                  onPress={() => setShowLogMenu(true)}
                   iconColor="#4CAF50"
                 />
               }
@@ -1171,8 +1376,8 @@ export default function SettingsScreen() {
                 clearAllData();
               }}
               contentStyle={{ height: 40 }}
-              loading={isClearing}
-              disabled={isClearing}
+              loading={isDataClearing}
+              disabled={isDataClearing}
             >
               Clear All Data
             </Button>
@@ -1214,7 +1419,7 @@ export default function SettingsScreen() {
       
       {/* Export confirmation modal */}
       <Portal>
-        <Dialog visible={showExportModal} onDismiss={() => setShowExportModal(false)} style={styles.dialog}>
+        <Dialog visible={showExportDialog} onDismiss={() => setShowExportDialog(false)} style={styles.dialog}>
           <Dialog.Title style={styles.dialogTitle}>
             <FontAwesome5 name="file-export" size={16} color="#4CAF50" style={{marginRight: 6}} />
             Export Data Before Clearing
@@ -1225,7 +1430,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
-            <Button onPress={() => setShowExportModal(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
+            <Button onPress={() => setShowExportDialog(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
               Cancel
             </Button>
             <Button 
@@ -1250,7 +1455,7 @@ export default function SettingsScreen() {
       
       {/* Final clear confirmation modal */}
       <Portal>
-        <Dialog visible={showConfirmClearModal} onDismiss={() => setShowConfirmClearModal(false)} style={styles.dialog}>
+        <Dialog visible={showClearConfirm} onDismiss={() => setShowClearConfirm(false)} style={styles.dialog}>
           <Dialog.Title style={styles.dialogTitle}>
             <FontAwesome5 name="trash-alt" size={16} color="#F44336" style={{marginRight: 6}} />
             Confirm Clear All Data
@@ -1261,7 +1466,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
-            <Button onPress={() => setShowConfirmClearModal(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
+            <Button onPress={() => setShowClearConfirm(false)} textColor="#757575" labelStyle={{fontSize: 13}}>
               Cancel
             </Button>
             <Button 
@@ -1279,10 +1484,10 @@ export default function SettingsScreen() {
       
       {/* Import/Export Logs Modal */}
       <Portal>
-        <PaperModal visible={showLogsModal} onDismiss={() => setShowLogsModal(false)} contentContainerStyle={styles.logsModal}>
+        <Modal visible={showLogs} onDismiss={() => setShowLogs(false)} contentContainerStyle={styles.logsModal}>
           <View style={styles.logsModalHeader}>
             <ThemedText style={styles.logsModalTitle}>Operation Logs</ThemedText>
-            <IconButton icon="close" size={20} onPress={() => setShowLogsModal(false)} />
+            <IconButton icon="close" size={20} onPress={() => setShowLogs(false)} />
           </View>
           
           <View style={styles.logsActionButtons}>
@@ -1298,11 +1503,7 @@ export default function SettingsScreen() {
           </View>
           
           <ScrollView style={styles.logsContainer}>
-            {isLoadingLogs ? (
-              <View style={styles.logsLoadingContainer}>
-                <ThemedText>Loading logs...</ThemedText>
-              </View>
-            ) : logs.length === 0 ? (
+            {logs.length === 0 ? (
               <View style={styles.emptyLogsContainer}>
                 <FontAwesome5 name="history" size={24} color="#CCCCCC" style={styles.emptyLogsIcon} />
                 <ThemedText style={styles.emptyLogsText}>No operation logs found</ThemedText>
@@ -1343,7 +1544,7 @@ export default function SettingsScreen() {
               ))
             )}
           </ScrollView>
-        </PaperModal>
+        </Modal>
       </Portal>
     </ThemedView>
   );
@@ -1519,10 +1720,6 @@ const styles = StyleSheet.create({
   logsContainer: {
     padding: 8,
     maxHeight: 500,
-  },
-  logsLoadingContainer: {
-    padding: 16,
-    alignItems: 'center',
   },
   emptyLogsContainer: {
     padding: 32,

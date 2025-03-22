@@ -1,65 +1,103 @@
 import patientStorageService from './patientStorageService';
 import appointmentStorageService from './appointmentStorageService';
+import dummyDataService from './dummyDataService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Constants
-const FIRST_LAUNCH_KEY = '@app_first_launch';
+// Check if running on web
+const isWeb = Platform.OS === 'web';
 
-/**
- * Check if this is the first time the app is being launched
- */
-export const isFirstLaunch = async (): Promise<boolean> => {
+// Check if we're in a browser environment where localStorage is available
+const isBrowser = isWeb && typeof window !== 'undefined' && window.localStorage;
+
+// Memory fallback for server-side rendering
+const memoryStorage: Record<string, string> = {};
+
+// Function to check if this is the first app launch
+const isFirstLaunch = async (): Promise<boolean> => {
   try {
-    let value;
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      value = localStorage.getItem(FIRST_LAUNCH_KEY);
+    const APP_FIRST_LAUNCH_KEY = '@app_first_launch';
+    let value: string | null;
+    
+    if (isWeb) {
+      if (isBrowser) {
+        // Use localStorage on web in browser
+        value = window.localStorage.getItem(APP_FIRST_LAUNCH_KEY);
+      } else {
+        // Use memory storage for SSR
+        value = memoryStorage[APP_FIRST_LAUNCH_KEY] || null;
+      }
     } else {
-      value = await AsyncStorage.getItem(FIRST_LAUNCH_KEY);
+      // Use AsyncStorage on native
+      value = await AsyncStorage.getItem(APP_FIRST_LAUNCH_KEY);
     }
-    return value === null; // First launch if the key doesn't exist
+    
+    return value === null; // If null, this is the first launch
   } catch (error) {
-    console.error('Error checking if first launch:', error);
-    return false; // Assume not first launch on error
+    console.error('Error checking first launch status:', error);
+    return true; // Default to first launch if there's an error
   }
 };
 
-/**
- * Mark the app as launched to prevent re-initialization on subsequent runs
- */
-export const markAsLaunched = async (): Promise<void> => {
+// Function to mark app as launched
+const markAsLaunched = async (): Promise<void> => {
   try {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      localStorage.setItem(FIRST_LAUNCH_KEY, 'false');
+    const APP_FIRST_LAUNCH_KEY = '@app_first_launch';
+    
+    if (isWeb) {
+      if (isBrowser) {
+        // Use localStorage on web in browser
+        window.localStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
+      } else {
+        // Use memory storage for SSR
+        memoryStorage[APP_FIRST_LAUNCH_KEY] = 'false';
+      }
     } else {
-      await AsyncStorage.setItem(FIRST_LAUNCH_KEY, 'false');
+      // Use AsyncStorage on native
+      await AsyncStorage.setItem(APP_FIRST_LAUNCH_KEY, 'false');
     }
   } catch (error) {
     console.error('Error marking app as launched:', error);
   }
 };
 
-/**
- * Initialize storage services, possibly with a forced reset
- */
+// Initialize storage with default data if needed
 export const initializeStorage = async (forceReset: boolean = false): Promise<void> => {
   try {
     // Check if this is the first launch
     const firstLaunch = await isFirstLaunch();
-    
+
     if (firstLaunch || forceReset) {
-      console.log('First launch or forced reset. Initializing with empty data...');
+      console.log(forceReset ? 'Force reset requested' : 'First launch detected', 'initializing storage');
       
-      // Reset storage to empty state
-      await patientStorageService.reset();
-      await appointmentStorageService.reset();
+      if (forceReset) {
+        // Re-initialize storage services
+        await patientStorageService.reset();
+        await appointmentStorageService.reset();
+      }
+
+      // Make sure dummy data toggle is initialized to false by default
+      const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
+      if (isWeb && isBrowser) {
+        localStorage.setItem(SHOW_DUMMY_DATA_KEY, 'false');
+      } else {
+        await AsyncStorage.setItem(SHOW_DUMMY_DATA_KEY, 'false');
+      }
       
-      // Mark as launched
+      // Let dummy data service handle dummy data initialization
+      await dummyDataService.initializeDummyData();
+      
+      // Mark as launched so we don't initialize again
       await markAsLaunched();
     } else {
-      console.log('Not first launch. Using existing data.');
+      console.log('Storage already initialized from previous launch');
+      
+      // Always check if dummy data needs to be initialized
+      await dummyDataService.initializeDummyData();
     }
   } catch (error) {
     console.error('Error initializing storage:', error);
   }
-}; 
+};
+
+export default initializeStorage; 
