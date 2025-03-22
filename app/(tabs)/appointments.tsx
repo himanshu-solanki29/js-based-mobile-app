@@ -41,6 +41,7 @@ import useAppointmentStorage from '@/utils/useAppointmentStorage';
 import { getPatientById } from '@/utils/patientStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { globalEventEmitter } from '@/utils/dummyDataService';
 
 // First, define status color constants at the top of the file
 const STATUS_COLORS = {
@@ -65,6 +66,9 @@ const STATUS_COLORS = {
     accent: '#2196F3'
   }
 };
+
+// Constants
+const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
 
 export default function AppointmentsScreen() {
   const {
@@ -149,6 +153,51 @@ export default function AppointmentsScreen() {
   
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
+  // Load show dummy data setting - initialize as false by default
+  const [showDummyData, setShowDummyData] = useState(false);
+  
+  // Listen for dummy data changes
+  useEffect(() => {
+    // Define the refresh handler
+    const handleDummyDataChange = () => {
+      console.log('AppointmentsScreen: Refreshing after dummy data change');
+      // Force a refresh by incrementing the refresh trigger
+      setRefreshTrigger(prev => prev + 1);
+    };
+    
+    // Add event listener
+    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    
+    // Remove event listener on cleanup
+    return () => {
+      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    };
+  }, []);
+  
+  // Reload show dummy data setting when refresh trigger changes
+  useEffect(() => {
+    const loadShowDummyDataSetting = async () => {
+      try {
+        let value;
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          value = localStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        } else {
+          value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
+        }
+        
+        // Default to false if setting doesn't exist
+        const newValue = value === null ? false : value === 'true';
+        console.log('AppointmentsScreen: Loaded showDummyData setting:', newValue);
+        setShowDummyData(newValue);
+      } catch (error) {
+        console.error('Error loading show dummy data setting:', error);
+        setShowDummyData(false);
+      }
+    };
+    
+    loadShowDummyDataSetting();
+  }, [refreshTrigger]);
+  
   // Filter appointments based on search query, selected date/range, and status
   const filteredAppointmentsMemo = useMemo(() => {
     let result = [...appointments];
@@ -179,8 +228,17 @@ export default function AppointmentsScreen() {
       result = result.filter(appointment => appointment.status === selectedStatus);
     }
     
+    // Filter out dummy/demo data if showDummyData is false
+    if (!showDummyData) {
+      result = result.filter(appointment => {
+        // Convert ID to number and check if it's a demo/initial ID (1-7)
+        const idNumber = parseInt(appointment.id);
+        return !(idNumber >= 1 && idNumber <= 7);
+      });
+    }
+    
     return result;
-  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments]);
+  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments, showDummyData]);
 
   // Function to format the date filter for display
   const getFormattedDateRange = () => {
@@ -737,6 +795,36 @@ export default function AppointmentsScreen() {
           <View style={styles.emptyContainer}>
             <FontAwesome5 name="calendar-times" size={48} color="#4CAF50" />
             <Text style={[styles.emptyText, { color: '#2e7d32' }]}>No appointments found</Text>
+            <Text style={[styles.emptySubText, { color: '#757575' }]}>
+              Use the + button below to create a new appointment
+            </Text>
+            {!showDummyData && (
+              <TouchableOpacity
+                style={styles.dummyDataButton}
+                onPress={async () => {
+                  try {
+                    // Enable dummy data
+                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                      localStorage.setItem(SHOW_DUMMY_DATA_KEY, 'true');
+                    } else {
+                      await AsyncStorage.setItem(SHOW_DUMMY_DATA_KEY, 'true');
+                    }
+                    
+                    // Update state
+                    setShowDummyData(true);
+                    setRefreshTrigger(prev => prev + 1);
+                    
+                    // Show toast
+                    showToast('Sample appointments enabled', 'success');
+                  } catch (error) {
+                    console.error('Error enabling dummy data:', error);
+                    showToast('Failed to enable sample appointments', 'error');
+                  }
+                }}
+              >
+                <Text style={styles.dummyDataButtonText}>Show sample appointments</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -903,6 +991,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2e7d32',
   },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#757575',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
   appointmentCard: {
     marginBottom: 0,
     borderRadius: 16,
@@ -1013,5 +1109,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#4CAF50',
+  },
+  dummyDataButton: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  dummyDataButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
 }); 
