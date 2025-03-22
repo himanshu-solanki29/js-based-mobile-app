@@ -279,16 +279,26 @@ export default function PatientDetailsScreen() {
                 <Text style={styles.detailLabel}>Phone</Text>
                 <Text style={styles.detailValue}>{patient.phone}</Text>
               </View>
-              <Button 
-                icon="phone" 
-                mode="text" 
-                compact 
-                style={styles.actionButton}
-                labelStyle={styles.actionButtonLabel}
-                onPress={() => {}}
-              >
-                Call
-              </Button>
+              <View style={styles.buttonsContainer}>
+                <Button 
+                  icon="phone" 
+                  mode="contained-tonal" 
+                  compact 
+                  style={styles.roundButton}
+                  contentStyle={styles.buttonContent}
+                  labelStyle={styles.roundButtonLabel}
+                  onPress={() => {}}
+                >{''}</Button>
+                <Button 
+                  icon="message-text-outline" 
+                  mode="contained-tonal" 
+                  compact 
+                  style={styles.roundButton}
+                  contentStyle={styles.buttonContent}
+                  labelStyle={styles.roundButtonLabel}
+                  onPress={() => {}}
+                >{''}</Button>
+              </View>
             </View>
             
             <View style={styles.detailItem}>
@@ -298,15 +308,14 @@ export default function PatientDetailsScreen() {
                 <Text style={styles.detailValue}>{patient.email}</Text>
               </View>
               <Button 
-                icon="message-text-outline" 
-                mode="text" 
+                icon="email-outline" 
+                mode="contained-tonal" 
                 compact 
-                style={styles.actionButton}
-                labelStyle={styles.actionButtonLabel}
+                style={styles.roundButton}
+                contentStyle={styles.buttonContent}
+                labelStyle={styles.roundButtonLabel}
                 onPress={() => {}}
-              >
-                Message
-              </Button>
+              >{''}</Button>
             </View>
           </View>
         </Surface>
@@ -721,12 +730,24 @@ const styles = StyleSheet.create({
   contactDetail: {
     flex: 1,
   },
-  actionButton: {
-    marginHorizontal: 0,
+  buttonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  actionButtonLabel: {
-    fontSize: 12,
-    marginLeft: 4,
+  roundButton: {
+    marginHorizontal: 4,
+    borderRadius: 20,
+    minWidth: 36,
+    height: 36,
+  },
+  buttonContent: {
+    height: 36,
+    width: 36,
+  },
+  roundButtonLabel: {
+    marginLeft: 0,
+    marginRight: 0,
+    fontSize: 14,
   },
   sectionDivider: {
     backgroundColor: '#EEEEEE',
