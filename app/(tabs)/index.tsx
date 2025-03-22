@@ -1,15 +1,15 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable, RefreshControl } from "react-native";
+import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable, RefreshControl, Modal, Platform } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
 import { 
-  updateAppointmentStatus,
-  useAppointments,
-  sortAppointmentsByDateDesc
+  useAppointments, 
+  sortAppointmentsByDateDesc,
+  updateAppointmentStatus
 } from "../../utils/appointmentStore";
 import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useTheme, IconButton, Menu, Dialog, TextInput, TouchableRipple } from 'react-native-paper';
 import { usePatients } from '@/utils/patientStore';
@@ -803,7 +803,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingTop: 8,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
   },
   welcomeText: {
     fontSize: 14,
