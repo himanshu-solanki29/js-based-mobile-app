@@ -183,18 +183,6 @@ export default function AppointmentDetailsScreen() {
     }
   }, [appointment?.status]);
   
-  // Add a timer to periodically refresh the appointment data
-  useEffect(() => {
-    // Set up a timer to refresh the appointment data every 2 seconds
-    // This ensures we catch any updates made elsewhere
-    const timer = setInterval(() => {
-      setRefreshKey(prevKey => prevKey + 1);
-    }, 2000);
-    
-    // Clean up the timer when the component unmounts
-    return () => clearInterval(timer);
-  }, []);
-  
   // Function to handle completion with medical record
   const handleCompletionWithMedicalRecord = async (medicalData: MedicalRecord) => {
     if (!appointment) return;
