@@ -1,9 +1,6 @@
 import StorageService from './storageService';
 import type { Patient, PatientFormData } from './patientStore';
 
-// Import only the data, not importing from patientStore to avoid circular dependency
-import { INITIAL_PATIENTS } from './initialData';
-
 // Types
 export type PatientsData = {
   [key: string]: Patient;
@@ -26,17 +23,15 @@ class PatientStorageService extends StorageService<PatientsData> {
   private patients: PatientsData;
   private listeners: (() => void)[] = [];
   public initialized: boolean = false;
-  private initialPatientIds: string[] = [];
   
   constructor() {
     super(PATIENT_STORAGE_KEY);
     this.patients = {};
+    this.listeners = [];
+    
     this.initialize().catch(err => {
       console.error('Failed to initialize patient storage:', err);
     });
-    
-    // Store initial patient IDs (1-5) for dummy data toggle
-    this.initialPatientIds = Object.keys(INITIAL_PATIENTS);
   }
   
   // Initialize the storage with default data if empty
@@ -169,84 +164,21 @@ class PatientStorageService extends StorageService<PatientsData> {
     return this.patients[id];
   }
   
-  // Reset storage to initial state
+  // Reset patient storage to empty
   async reset(): Promise<void> {
     try {
       console.log('Resetting patient storage to initial state');
-      // Reset to initial data
-      this.patients = INITIAL_PATIENTS;
+      // Reset to empty object
+      this.patients = {};
       // Save to storage
       await this.saveData(this.patients);
       // Notify listeners
       this.notifyListeners();
+      
+      return Promise.resolve();
     } catch (error) {
       console.error('Error resetting patient storage:', error);
-      throw error;
-    }
-  }
-  
-  // Remove dummy data
-  async removeDummyData(): Promise<void> {
-    await this.ensureInitialized();
-    
-    try {
-      console.log('Removing dummy patient data');
-      
-      // Create a new patients object without the dummy data
-      const filteredPatients: PatientsData = {};
-      
-      // Only keep patients that are not initial dummy data (IDs 1-5)
-      Object.entries(this.patients).forEach(([id, patient]) => {
-        if (!this.initialPatientIds.includes(id)) {
-          filteredPatients[id] = patient;
-        }
-      });
-      
-      // Update our local patients object
-      this.patients = filteredPatients;
-      
-      // Save to storage
-      await this.saveData(this.patients);
-      
-      // Notify listeners
-      this.notifyListeners();
-    } catch (error) {
-      console.error('Error removing dummy patient data:', error);
-      throw error;
-    }
-  }
-  
-  // Restore dummy data
-  async restoreDummyData(): Promise<void> {
-    await this.ensureInitialized();
-    
-    try {
-      console.log('Restoring dummy patient data');
-      
-      // Create a merged patients object with dummy data
-      const mergedPatients: PatientsData = {
-        ...this.patients
-      };
-      
-      // Add back all the initial patients
-      Object.entries(INITIAL_PATIENTS).forEach(([id, patient]) => {
-        // Only add if it doesn't already exist
-        if (!mergedPatients[id]) {
-          mergedPatients[id] = patient;
-        }
-      });
-      
-      // Update our local patients object
-      this.patients = mergedPatients;
-      
-      // Save to storage
-      await this.saveData(this.patients);
-      
-      // Notify listeners
-      this.notifyListeners();
-    } catch (error) {
-      console.error('Error restoring dummy patient data:', error);
-      throw error;
+      return Promise.reject(error);
     }
   }
   
