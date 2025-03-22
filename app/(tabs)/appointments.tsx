@@ -439,7 +439,7 @@ export default function AppointmentsScreen() {
   };
 
   // Define status options for filter chips
-  const statusOptions = ['confirmed', 'pending', 'completed', 'cancelled', 'all'] as const;
+  const statusOptions = ['all', 'confirmed', 'pending', 'completed', 'cancelled'] as const;
 
   // Update the renderStatusBadge function
   const renderStatusBadge = (status: AppointmentStatus) => {
@@ -740,9 +740,11 @@ export default function AppointmentsScreen() {
           <View style={styles.emptyContainer}>
             <FontAwesome5 name="calendar-times" size={48} color="#4CAF50" />
             <Text style={[styles.emptyText, { color: '#2e7d32' }]}>No appointments found</Text>
-            <Text style={[styles.emptySubText, { color: '#757575' }]}>
-              Use the + button below to create a new appointment
-            </Text>
+            {appointments.length === 0 && (
+              <Text style={[styles.emptySubText, { color: '#757575' }]}>
+                Use the + button below to create a new appointment
+              </Text>
+            )}
           </View>
         }
       />
