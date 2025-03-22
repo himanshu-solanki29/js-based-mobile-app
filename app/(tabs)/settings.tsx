@@ -396,6 +396,21 @@ export default function SettingsScreen() {
         console.log(`Filtered out ${appointments.length - filteredAppointments.length} dummy appointments`);
       }
       
+      // Check if there's any data to export after filtering
+      if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
+        showToast('No data to export', 'warning');
+        
+        // Add log entry for the failed export
+        await logStorageService.addLog({
+          operation: 'export',
+          status: 'warning',
+          details: 'Export attempted but no data found to export'
+        });
+        
+        setIsExporting(false);
+        return;
+      }
+      
       // Create export data object
       const exportData = {
         patients: filteredPatients,
