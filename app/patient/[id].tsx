@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, TouchableOpacity, View, Alert, Platform } from "react-native";
+import { StyleSheet, ScrollView, TouchableOpacity, View, Alert, Platform, Linking } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
@@ -186,6 +186,61 @@ export default function PatientDetailsScreen() {
     }
   };
 
+  // Add these functions to handle communication actions
+  const handlePhoneCall = () => {
+    if (patient?.phone) {
+      const phoneUrl = `tel:${patient.phone.replace(/\D/g, '')}`;
+      Linking.canOpenURL(phoneUrl)
+        .then((supported) => {
+          if (supported) {
+            Linking.openURL(phoneUrl);
+          } else {
+            showToast('Phone calls not supported on this device', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error opening phone app:', err);
+          showToast('Could not open phone app', 'error');
+        });
+    }
+  };
+
+  const handleSendSMS = () => {
+    if (patient?.phone) {
+      const smsUrl = `sms:${patient.phone.replace(/\D/g, '')}`;
+      Linking.canOpenURL(smsUrl)
+        .then((supported) => {
+          if (supported) {
+            Linking.openURL(smsUrl);
+          } else {
+            showToast('SMS not supported on this device', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error opening messaging app:', err);
+          showToast('Could not open messaging app', 'error');
+        });
+    }
+  };
+
+  const handleSendEmail = () => {
+    if (patient?.email) {
+      const emailUrl = `mailto:${patient.email}?subject=Regarding your appointment`;
+      Linking.canOpenURL(emailUrl)
+        .then((supported) => {
+          if (supported) {
+            Linking.openURL(emailUrl);
+          } else {
+            showToast('Email not supported on this device', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error opening email app:', err);
+          showToast('Could not open email app', 'error');
+        });
+    }
+  };
+
   // If loading
   if (isLoading) {
     return (
@@ -282,21 +337,21 @@ export default function PatientDetailsScreen() {
               <View style={styles.buttonsContainer}>
                 <Button 
                   icon="phone" 
-                  mode="contained-tonal" 
+                  mode="contained" 
                   compact 
-                  style={styles.roundButton}
+                  style={[styles.roundButton, {backgroundColor: '#4CAF50'}]}
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.roundButtonLabel}
-                  onPress={() => {}}
+                  onPress={handlePhoneCall}
                 >{''}</Button>
                 <Button 
                   icon="message-text-outline" 
-                  mode="contained-tonal" 
+                  mode="contained" 
                   compact 
-                  style={styles.roundButton}
+                  style={[styles.roundButton, {backgroundColor: '#FF9800'}]}
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.roundButtonLabel}
-                  onPress={() => {}}
+                  onPress={handleSendSMS}
                 >{''}</Button>
               </View>
             </View>
@@ -309,12 +364,12 @@ export default function PatientDetailsScreen() {
               </View>
               <Button 
                 icon="email-outline" 
-                mode="contained-tonal" 
+                mode="contained" 
                 compact 
-                style={styles.roundButton}
+                style={[styles.roundButton, {backgroundColor: '#2196F3'}]}
                 contentStyle={styles.buttonContent}
                 labelStyle={styles.roundButtonLabel}
-                onPress={() => {}}
+                onPress={handleSendEmail}
               >{''}</Button>
             </View>
           </View>
@@ -736,18 +791,20 @@ const styles = StyleSheet.create({
   },
   roundButton: {
     marginHorizontal: 4,
-    borderRadius: 20,
-    minWidth: 36,
-    height: 36,
+    borderRadius: 24,
+    minWidth: 44,
+    height: 44,
+    elevation: 2,
   },
   buttonContent: {
-    height: 36,
-    width: 36,
+    height: 44,
+    width: 44,
   },
   roundButtonLabel: {
     marginLeft: 0,
     marginRight: 0,
-    fontSize: 14,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
   sectionDivider: {
     backgroundColor: '#EEEEEE',
