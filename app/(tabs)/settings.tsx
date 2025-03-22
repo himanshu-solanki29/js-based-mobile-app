@@ -1247,7 +1247,7 @@ export default function SettingsScreen() {
           
           <View style={styles.settingDescription}>
             <ThemedText style={styles.descriptionText}>
-              Display or hide sample data in your lists
+              Sync your data across devices when signed in
             </ThemedText>
           </View>
           
