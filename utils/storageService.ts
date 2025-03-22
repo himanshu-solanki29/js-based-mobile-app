@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { requestStoragePermissions, checkStoragePermissions } from '../app/runtime-permissions';
 
 /**
  * Check if the app is running on web platform
@@ -28,10 +29,48 @@ class StorageService<T> {
   }
   
   /**
+   * Check and request storage permissions on Android if needed
+   */
+  private async ensurePermissions(): Promise<boolean> {
+    // Only needed for Android
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+    
+    try {
+      // Check if we already have permissions
+      const hasPermissions = await checkStoragePermissions();
+      if (hasPermissions) {
+        return true;
+      }
+      
+      // Request permissions if needed
+      const granted = await requestStoragePermissions();
+      if (!granted) {
+        console.error('Storage permissions not granted');
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error checking permissions:', error);
+      return false;
+    }
+  }
+  
+  /**
    * Save data to storage
    */
   async saveData(data: T): Promise<void> {
     try {
+      // Check permissions first on Android
+      if (Platform.OS === 'android') {
+        const hasPermissions = await this.ensurePermissions();
+        if (!hasPermissions) {
+          throw new Error('Storage permissions are required');
+        }
+      }
+      
       const jsonValue = JSON.stringify(data);
       
       if (isWeb) {
@@ -57,6 +96,14 @@ class StorageService<T> {
    */
   async getData(): Promise<T | null> {
     try {
+      // Check permissions first on Android
+      if (Platform.OS === 'android') {
+        const hasPermissions = await this.ensurePermissions();
+        if (!hasPermissions) {
+          throw new Error('Storage permissions are required');
+        }
+      }
+      
       let jsonValue: string | null;
       
       if (isWeb) {
@@ -84,6 +131,14 @@ class StorageService<T> {
    */
   async removeData(): Promise<void> {
     try {
+      // Check permissions first on Android
+      if (Platform.OS === 'android') {
+        const hasPermissions = await this.ensurePermissions();
+        if (!hasPermissions) {
+          throw new Error('Storage permissions are required');
+        }
+      }
+      
       if (isWeb) {
         if (isBrowser) {
           // Use localStorage for web in browser
@@ -107,6 +162,14 @@ class StorageService<T> {
    */
   async clearAllData(): Promise<void> {
     try {
+      // Check permissions first on Android
+      if (Platform.OS === 'android') {
+        const hasPermissions = await this.ensurePermissions();
+        if (!hasPermissions) {
+          throw new Error('Storage permissions are required');
+        }
+      }
+      
       if (isWeb) {
         if (isBrowser) {
           // Use localStorage for web in browser

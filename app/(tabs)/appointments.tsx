@@ -8,6 +8,7 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { formatDate } from '@/utils/dateFormat';
 import { AppointmentScheduler } from '@/components/AppointmentScheduler';
 import { Calendar, CalendarList } from 'react-native-calendars';
+import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
 import { 
   Button, 
   IconButton, 
@@ -644,14 +645,30 @@ export default function AppointmentsScreen() {
     patientName: string;
   }) => {
     try {
+      // On Android, check for storage permissions
+      if (Platform.OS === 'android') {
+        const hasPermissions = await checkStoragePermissions();
+        if (!hasPermissions) {
+          const granted = await requestStoragePermissions();
+          if (!granted) {
+            Alert.alert(
+              "Permission Required", 
+              "Storage permission is needed to save appointment data.",
+              [{ text: "OK" }]
+            );
+            return;
+          }
+        }
+      }
+      
       // Create new appointment with pending status
       const newAppointment = await addAppointment({
         date: appointmentData.date,
-      time: appointmentData.time,
-      reason: appointmentData.reason,
+        time: appointmentData.time,
+        reason: appointmentData.reason,
         notes: appointmentData.notes || '',
         patientId: appointmentData.patientId,
-      status: 'pending'
+        status: 'pending'
       });
       
       // Trigger a refresh to update the UI

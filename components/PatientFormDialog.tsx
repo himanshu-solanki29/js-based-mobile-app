@@ -40,7 +40,7 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validate the form
     if (!formData.name.trim()) {
       alert("Please enter patient name");
@@ -52,32 +52,37 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
       return;
     }
     
-    // Add the patient to our store
-    const newPatient = addPatient({
-      ...formData,
-      // Ensure proper format for key fields
-      height: formData.height ? `${formData.height} cm` : "",
-      weight: formData.weight ? `${formData.weight} kg` : "",
-    });
-    
-    // Reset form
-    setFormData({
-      name: "",
-      age: 0,
-      gender: "Male",
-      phone: "",
-      email: "",
-      height: "",
-      weight: "",
-      bloodPressure: "",
-      medicalHistory: ""
-    });
-    
-    // Close dialog
-    onDismiss();
-    
-    // Call success callback with new patient ID
-    onSuccess(newPatient.id);
+    try {
+      // Add the patient to our store
+      const newPatient = await addPatient({
+        ...formData,
+        // Ensure proper format for key fields
+        height: formData.height ? `${formData.height} cm` : "",
+        weight: formData.weight ? `${formData.weight} kg` : "",
+      });
+      
+      // Reset form
+      setFormData({
+        name: "",
+        age: 0,
+        gender: "Male",
+        phone: "",
+        email: "",
+        height: "",
+        weight: "",
+        bloodPressure: "",
+        medicalHistory: ""
+      });
+      
+      // Close dialog
+      onDismiss();
+      
+      // Call success callback with new patient ID
+      onSuccess(newPatient.id);
+    } catch (error) {
+      console.error("Error adding patient:", error);
+      alert("Failed to create patient. Please try again.");
+    }
   };
 
   return (

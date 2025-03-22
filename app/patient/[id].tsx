@@ -1,26 +1,25 @@
-import { StyleSheet, ScrollView, TouchableOpacity, View, Alert } from "react-native";
+import { StyleSheet, ScrollView, TouchableOpacity, View, Alert, Platform } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
-import { formatDate } from "@/utils/dateFormat";
-import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { Button, Text, Card, Badge, Surface, Divider, Avatar, ProgressBar, IconButton, TouchableRipple, useTheme, Appbar } from 'react-native-paper';
-import { useState, useEffect } from "react";
-import React from 'react';
-
 import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Card, Chip, Divider, IconButton, List, Text } from "react-native-paper";
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import { formatDate } from "@/utils/dateFormat";
+import { AppointmentScheduler } from "@/components/AppointmentScheduler";
+import { useGlobalToast } from "@/components/GlobalToastProvider";
+import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
 import { 
-  getPatientById,
+  getPatient, 
+  editPatient, 
+  deletePatient, 
   usePatients
 } from "@/utils/patientStore";
-import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { 
   getPatientAppointments,
   addAppointment, 
-  Appointment,
-  useAppointments
+  Appointment
 } from '@/utils/appointmentStore';
-import { useGlobalToast } from '@/components/GlobalToastProvider';
 import { globalEventEmitter } from '@/app/(tabs)/index';
 
 // Mock appointment data used across the app
@@ -163,13 +162,13 @@ export default function PatientDetailsScreen() {
   const id = params.id as string;
   const router = useRouter();
   const { showToast } = useGlobalToast();
-  const theme = useTheme();
   
   const [patient, setPatient] = useState<Patient | null>(null);
   const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isShowingScheduler, setIsShowingScheduler] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSchedulingAppointment, setIsSchedulingAppointment] = useState(false);
 
   // Listen for dummy data changes
   useEffect(() => {
@@ -197,7 +196,7 @@ export default function PatientDetailsScreen() {
         console.log('Loading patient with ID:', id);
         
         // Get the patient
-        const patientData = await getPatientById(id);
+        const patientData = await getPatient(id);
         if (!patientData) {
           console.error('Patient not found:', id);
           showToast('Patient not found', 'error');
@@ -236,33 +235,49 @@ export default function PatientDetailsScreen() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [patientAppointments]);
 
-  const handleScheduleAppointment = async (appointmentData: {
-    date: Date;
-    time: string;
-    reason: string;
-    notes: string;
-    patientId: string;
-    patientName: string;
-  }) => {
+  const handleScheduleAppointment = async (appointmentData) => {
     try {
-      // Use the appointmentStore to add the appointment
+      setIsSchedulingAppointment(true);
+
+      // On Android, check for storage permissions
+      if (Platform.OS === 'android') {
+        const hasPermissions = await checkStoragePermissions();
+        if (!hasPermissions) {
+          const granted = await requestStoragePermissions();
+          if (!granted) {
+            Alert.alert(
+              "Permission Required", 
+              "Storage permission is needed to save appointment data.",
+              [{ text: "OK" }]
+            );
+            setIsSchedulingAppointment(false);
+            return;
+          }
+        }
+      }
+
       const newAppointment = await addAppointment({
         date: appointmentData.date,
         time: appointmentData.time,
         reason: appointmentData.reason,
-        notes: appointmentData.notes,
-        patientId: appointmentData.patientId,
+        notes: appointmentData.notes || '',
+        patientId: patient?.id,
         status: 'pending'
       });
-      
-      // Show toast notification
-      showToast(`Appointment scheduled for ${formatDate(newAppointment.date)} at ${newAppointment.time}`, 'success');
-      
-      // Close the scheduler
+
+      showToast(
+        `Appointment scheduled for ${patient?.name} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
+        'success'
+      );
       setIsShowingScheduler(false);
+      
+      // Refresh the appointments list
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
-      console.error('Failed to schedule appointment:', error);
-      showToast('Failed to schedule appointment. Please try again.', 'error');
+      console.error('Error scheduling appointment:', error);
+      showToast('Failed to schedule appointment', 'error');
+    } finally {
+      setIsSchedulingAppointment(false);
     }
   };
 

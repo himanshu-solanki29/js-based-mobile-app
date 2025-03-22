@@ -1,7 +1,7 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal as RNModal } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { useState, useEffect } from 'react';
 import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph, Menu, IconButton } from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import * as Sharing from 'expo-sharing';
@@ -17,6 +17,7 @@ import { useGlobalToast } from '@/components/GlobalToastProvider';
 import type { ToastType } from '@/components/Toast';
 import StorageService from '@/utils/storageService';
 import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS } from '@/utils/initialData';
+import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
 
 // Log storage service
 const LOG_STORAGE_KEY = 'operation_logs';

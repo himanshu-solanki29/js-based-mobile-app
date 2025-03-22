@@ -36,7 +36,7 @@ export default function PatientRegistrationScreen() {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validate the form
     if (!formData.name.trim()) {
       alert("Please enter patient name");
@@ -44,7 +44,7 @@ export default function PatientRegistrationScreen() {
     }
     
     // Add the patient to our store
-    const newPatient = addPatient({
+    const newPatient = await addPatient({
       ...formData,
       // Ensure proper format for key fields
       height: formData.height ? `${formData.height} cm` : "",
