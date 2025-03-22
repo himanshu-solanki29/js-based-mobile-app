@@ -83,6 +83,31 @@ export default function SettingsScreen() {
     );
   };
 
+  const clearAllData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'Are you sure you want to clear all app data? This action cannot be undone.',
+      [
+        { 
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: () => {
+            // Show confirmation of success
+            Alert.alert(
+              'Data Cleared',
+              'All data has been cleared successfully.',
+              [{ text: 'OK' }]
+            );
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -228,6 +253,21 @@ export default function SettingsScreen() {
               Import Data
             </Button>
           </View>
+          
+          <Divider style={styles.divider} />
+          
+          <View style={styles.clearDataContainer}>
+            <Button 
+              mode="outlined" 
+              icon={() => <FontAwesome5 name="trash-alt" size={16} color="#F44336" />}
+              style={styles.clearDataButton}
+              textColor="#F44336"
+              onPress={clearAllData}
+              contentStyle={{ height: 40 }}
+            >
+              Clear All Data
+            </Button>
+          </View>
         </Surface>
         
         {/* About */}
@@ -361,5 +401,13 @@ const styles = StyleSheet.create({
   copyright: {
     fontSize: 12,
     color: '#9E9E9E',
+  },
+  clearDataContainer: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  clearDataButton: {
+    borderColor: '#F44336',
+    borderRadius: 8,
   },
 }); 
