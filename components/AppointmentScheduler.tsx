@@ -84,7 +84,12 @@ export function AppointmentScheduler({
   
   // Initialize patients list on mount
   useEffect(() => {
-    setFilteredPatients(patients);
+    // Filter out dummy data (patients with IDs 1-5)
+    const realPatients = patients.filter(patient => {
+      const idNumber = parseInt(patient.id);
+      return !(idNumber >= 1 && idNumber <= 5);
+    });
+    setFilteredPatients(realPatients);
   }, [patients]);
 
   // Find patient by ID effect
@@ -157,11 +162,17 @@ export function AppointmentScheduler({
   
   // Filter patients based on search query
   useEffect(() => {
+    // First filter out dummy patients (IDs 1-5)
+    const realPatients = patients.filter(patient => {
+      const idNumber = parseInt(patient.id);
+      return !(idNumber >= 1 && idNumber <= 5);
+    });
+    
     if (patientSearch.trim() === '') {
-      setFilteredPatients(patients);
+      setFilteredPatients(realPatients);
     } else {
       const query = patientSearch.toLowerCase();
-      const filtered = patients.filter(patient => 
+      const filtered = realPatients.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
@@ -447,6 +458,13 @@ export function AppointmentScheduler({
           renderItem={renderPatientItem}
           keyExtractor={item => item.id}
           style={styles.patientList}
+          ListEmptyComponent={
+            <View style={styles.emptyPatientList}>
+              <FontAwesome5 name="user-plus" size={40} color={primaryColor} style={styles.emptyIcon} />
+              <Text style={styles.emptyText}>No patients found</Text>
+              <Text style={styles.emptySubText}>Create patients in the Patients tab</Text>
+            </View>
+          }
         />
         <View style={styles.actions}>
           <Button 
@@ -770,5 +788,23 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     borderRadius: 8,
+  },
+  emptyPatientList: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    height: 200,
+  },
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  emptySubText: {
+    fontSize: 12,
+    color: '#757575',
   },
 }); 
