@@ -10,6 +10,7 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { addPatient, PatientFormData } from "@/utils/patientStore";
 import { Portal, Modal } from 'react-native-paper';
+import { globalEventEmitter } from '@/app/(tabs)/index';
 
 interface PatientFormDialogProps {
   visible: boolean;
@@ -81,6 +82,9 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
         bloodPressure: "",
         medicalHistory: ""
       });
+      
+      // Notify other components that data has changed
+      globalEventEmitter.emit('DATA_CHANGED');
       
       // Close dialog
       onDismiss();

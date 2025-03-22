@@ -16,6 +16,7 @@ import {
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import usePatientStorage from '@/utils/usePatientStorage';
+import { globalEventEmitter } from './index';
 
 // Define appointment type
 type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
@@ -41,11 +42,29 @@ export default function ExploreScreen() {
   const [isPatientFormVisible, setPatientFormVisible] = useState(false);
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Listen for data changes
+  useEffect(() => {
+    const handleDataChange = () => {
+      console.log('ExploreScreen: Refreshing after data change');
+      // Force a refresh
+      setRefreshTrigger(prev => prev + 1);
+    };
+    
+    // Add event listener
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
+    
+    // Remove event listener on cleanup
+    return () => {
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
+    };
+  }, []);
   
   // Filter to only show user-created patients
   const userCreatedPatients = useMemo(() => {
     return patients.filter(patient => patient.userCreated === true);
-  }, [patients]);
+  }, [patients, refreshTrigger]);
 
   // Initialize filtered patients on component mount and when user-created patients change
   useEffect(() => {
@@ -132,10 +151,12 @@ export default function ExploreScreen() {
     // Show success message
     showToast('Patient added successfully!', 'success');
     
-    // Close the dialog and refresh patients list
+    // Close the dialog
     setPatientFormVisible(false);
-    // Re-fetch patients
-    setFilteredPatients(userCreatedPatients);
+    setAddPatientDialogVisible(false);
+    
+    // Notify other components that data has changed
+    globalEventEmitter.emit('DATA_CHANGED');
   };
 
   const renderPatientItem = ({ item }: { item: Patient }) => (
