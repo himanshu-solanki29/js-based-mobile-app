@@ -124,6 +124,20 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
     return newAppointment;
   }
   
+  // Add multiple appointments at once (for import functionality)
+  async bulkAddAppointments(newAppointments: Appointment[]): Promise<void> {
+    await this.ensureInitialized();
+    
+    // Add all new appointments to the array
+    this.appointments = [
+      ...this.appointments,
+      ...newAppointments
+    ];
+    
+    // Persist to storage
+    await this.persistAppointments();
+  }
+  
   // Sort appointments by date (ascending)
   sortAppointmentsByDate(appointments = this.appointments): Appointment[] {
     return [...appointments].sort((a, b) => {

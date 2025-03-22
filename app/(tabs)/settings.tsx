@@ -15,9 +15,120 @@ import appointmentStorageService from '@/utils/appointmentStorageService';
 import { initializeStorage } from '@/utils/initializeStorage';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 
+// Helper function to convert JSON to CSV string
+const jsonToCSV = (jsonData) => {
+  if (!jsonData || jsonData.length === 0) return '';
+  
+  // Get headers from keys of first object
+  const headers = Object.keys(jsonData[0]);
+  
+  // Create CSV header row
+  const csvRows = [headers.join(',')];
+  
+  // Add data rows
+  for (const item of jsonData) {
+    const values = headers.map(header => {
+      const value = item[header];
+      // Handle nested objects by stringifying them
+      const cellValue = typeof value === 'object' && value !== null 
+        ? JSON.stringify(value).replace(/"/g, '""') 
+        : value;
+      
+      // Escape commas, quotes, etc.
+      return `"${String(cellValue).replace(/"/g, '""')}"`;
+    });
+    csvRows.push(values.join(','));
+  }
+  
+  // Return CSV string
+  return csvRows.join('\n');
+};
+
+// Helper function to parse CSV string back to JSON
+const csvToJSON = (csvString) => {
+  const lines = csvString.split('\n');
+  if (lines.length <= 1) return [];
+  
+  // Get headers from first line
+  const headers = lines[0].split(',');
+  
+  const result = [];
+  
+  // Process data rows
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue; // Skip empty lines
+    
+    const obj = {};
+    let currentIndex = 0;
+    let inQuotes = false;
+    let currentValue = '';
+    let headerIndex = 0;
+    
+    // Parse the line character by character to handle quoted fields with commas
+    for (let j = 0; j < lines[i].length; j++) {
+      const char = lines[i][j];
+      
+      if (char === '"') {
+        // Toggle quote state
+        if (inQuotes && lines[i][j+1] === '"') {
+          // Handle escaped quotes
+          currentValue += '"';
+          j++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // End of field
+        let value = currentValue.trim();
+        
+        // Try to parse nested JSON objects
+        if (value.startsWith('{') && value.endsWith('}')) {
+          try {
+            value = JSON.parse(value);
+          } catch (e) {
+            // Keep as string if parsing fails
+          }
+        }
+        
+        // Assign to object using the corresponding header
+        obj[headers[headerIndex]] = value;
+        
+        // Reset for next field
+        currentValue = '';
+        headerIndex++;
+      } else {
+        // Add character to current field value
+        currentValue += char;
+      }
+    }
+    
+    // Add the last field
+    if (headerIndex < headers.length) {
+      let value = currentValue.trim();
+      
+      // Try to parse nested JSON objects
+      if (value.startsWith('{') && value.endsWith('}')) {
+        try {
+          value = JSON.parse(value);
+        } catch (e) {
+          // Keep as string if parsing fails
+        }
+      }
+      
+      obj[headers[headerIndex]] = value;
+    }
+    
+    result.push(obj);
+  }
+  
+  return result;
+};
+
 export default function SettingsScreen() {
   const { showToast } = useGlobalToast();
   const [isClearing, setIsClearing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [dataSync, setDataSync] = useState(true);
@@ -60,34 +171,260 @@ export default function SettingsScreen() {
 
   const exportPatientData = async () => {
     try {
-      const patients = getPatientsArray();
-      const fileUri = `${FileSystem.documentDirectory}patient_data.json`;
+      setIsExporting(true);
+      showToast('Preparing data for export...', 'info');
       
-      await FileSystem.writeAsStringAsync(
-        fileUri,
-        JSON.stringify(patients, null, 2),
-        { encoding: FileSystem.EncodingType.UTF8 }
-      );
+      // Get all data to export
+      const patients = await patientStorageService.getPatients();
+      const appointments = await appointmentStorageService.getAppointments();
       
-      if (Platform.OS === 'android' || Platform.OS === 'ios') {
+      // Create data for export
+      const exportData = {
+        patients: Object.values(patients),
+        appointments
+      };
+      
+      // Convert to CSV
+      const patientsCSV = jsonToCSV(Object.values(patients));
+      const appointmentsCSV = jsonToCSV(appointments);
+      
+      // Create export directory if it doesn't exist
+      const exportDir = `${FileSystem.documentDirectory}exports/`;
+      const exportDirInfo = await FileSystem.getInfoAsync(exportDir);
+      
+      if (!exportDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
+      }
+      
+      // Write CSV files
+      const timestamp = new Date().toISOString().replace(/:/g, '-');
+      const patientsFile = `${exportDir}patients_${timestamp}.csv`;
+      const appointmentsFile = `${exportDir}appointments_${timestamp}.csv`;
+      
+      await FileSystem.writeAsStringAsync(patientsFile, patientsCSV);
+      await FileSystem.writeAsStringAsync(appointmentsFile, appointmentsCSV);
+      
+      // Create a zip file with both CSVs
+      const zipFile = `${FileSystem.documentDirectory}holistic_health_export_${timestamp}.zip`;
+      
+      // For simplicity, we'll just share each file separately instead of zipping
+      // Share files
+      if (Platform.OS === 'web') {
+        // For web, download the files
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(patientsCSV));
+        element.setAttribute('download', `patients_${timestamp}.csv`);
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+        
+        // Download appointments file
+        const element2 = document.createElement('a');
+        element2.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(appointmentsCSV));
+        element2.setAttribute('download', `appointments_${timestamp}.csv`);
+        element2.style.display = 'none';
+        document.body.appendChild(element2);
+        element2.click();
+        document.body.removeChild(element2);
+        
+        showToast('Export complete. Files downloaded.', 'success');
+      } else {
+        // For mobile platforms
         if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri);
+          // Share the patients file first
+          await Sharing.shareAsync(patientsFile, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Patients Data',
+            UTI: 'public.comma-separated-values-text'
+          });
+          
+          // Then share the appointments file
+          await Sharing.shareAsync(appointmentsFile, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Appointments Data',
+            UTI: 'public.comma-separated-values-text'
+          });
+          
+          showToast('Export complete', 'success');
         } else {
           Alert.alert('Error', 'Sharing is not available on this device');
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to export patient data');
-      console.error(error);
+      console.error('Export error:', error);
+      showToast('Failed to export data', 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const importPatientData = async () => {
-    Alert.alert(
-      'Import Patient Data',
-      'This feature will be available in a future update.',
-      [{ text: 'OK' }]
-    );
+    try {
+      setIsImporting(true);
+      
+      if (Platform.OS === 'web') {
+        // For web, create a file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.multiple = true; // Allow multiple files
+        input.onchange = async (event) => {
+          const files = (event.target as HTMLInputElement).files;
+          if (files && files.length > 0) {
+            await processImportFiles(files);
+          } else {
+            showToast('No files selected', 'info');
+            setIsImporting(false);
+          }
+        };
+        input.click();
+      } else {
+        // For mobile platforms
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'text/csv',
+          multiple: true,
+          copyToCacheDirectory: true
+        });
+        
+        if (result.canceled) {
+          showToast('Import canceled', 'info');
+          setIsImporting(false);
+          return;
+        }
+        
+        // Process the selected files
+        await processImportFiles(result.assets);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      showToast('Failed to import data', 'error');
+      setIsImporting(false);
+    }
+  };
+  
+  const processImportFiles = async (files) => {
+    try {
+      let patientsFile = null;
+      let appointmentsFile = null;
+      
+      // Identify which file is which
+      for (const file of files) {
+        const fileName = file.name || file.uri.split('/').pop();
+        if (fileName.includes('patients')) {
+          patientsFile = file;
+        } else if (fileName.includes('appointments')) {
+          appointmentsFile = file;
+        }
+      }
+      
+      // Process patients data if available
+      if (patientsFile) {
+        let patientsContent;
+        
+        if (Platform.OS === 'web') {
+          // Read file content on web
+          patientsContent = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsText(patientsFile);
+          });
+        } else {
+          // Read file content on mobile
+          patientsContent = await FileSystem.readAsStringAsync(patientsFile.uri);
+        }
+        
+        // Parse CSV to JSON
+        const importedPatients = csvToJSON(patientsContent);
+        
+        // Get existing patients and check for duplicates
+        const existingPatients = await patientStorageService.getPatients();
+        const newPatients = {};
+        let duplicateCount = 0;
+        let addedCount = 0;
+        
+        for (const patient of importedPatients) {
+          // Check if patient with same ID already exists
+          if (existingPatients[patient.id]) {
+            duplicateCount++;
+            continue; // Skip duplicate
+          }
+          
+          // Add to new patients object
+          newPatients[patient.id] = patient;
+          addedCount++;
+        }
+        
+        // Add new patients to storage
+        if (addedCount > 0) {
+          await patientStorageService.bulkAddPatients(newPatients);
+          showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
+        } else if (duplicateCount > 0) {
+          showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
+        } else {
+          showToast('No patients data found in file', 'info');
+        }
+      }
+      
+      // Process appointments data if available
+      if (appointmentsFile) {
+        let appointmentsContent;
+        
+        if (Platform.OS === 'web') {
+          // Read file content on web
+          appointmentsContent = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsText(appointmentsFile);
+          });
+        } else {
+          // Read file content on mobile
+          appointmentsContent = await FileSystem.readAsStringAsync(appointmentsFile.uri);
+        }
+        
+        // Parse CSV to JSON
+        const importedAppointments = csvToJSON(appointmentsContent);
+        
+        // Get existing appointments and check for duplicates
+        const existingAppointments = await appointmentStorageService.getAppointments();
+        const existingIds = new Set(existingAppointments.map(app => app.id));
+        
+        const newAppointments = [];
+        let duplicateCount = 0;
+        let addedCount = 0;
+        
+        for (const appointment of importedAppointments) {
+          // Check if appointment with same ID already exists
+          if (existingIds.has(appointment.id)) {
+            duplicateCount++;
+            continue; // Skip duplicate
+          }
+          
+          // Add to new appointments array
+          newAppointments.push(appointment);
+          addedCount++;
+        }
+        
+        // Add new appointments to storage
+        if (addedCount > 0) {
+          await appointmentStorageService.bulkAddAppointments(newAppointments);
+          showToast(`Imported ${addedCount} appointments (${duplicateCount} duplicates skipped)`, 'success');
+        } else if (duplicateCount > 0) {
+          showToast(`No new appointments added. ${duplicateCount} duplicates skipped.`, 'info');
+        } else {
+          showToast('No appointments data found in file', 'info');
+        }
+      }
+      
+      if (!patientsFile && !appointmentsFile) {
+        showToast('No valid data files found', 'warning');
+      }
+    } catch (error) {
+      console.error('Error processing import files:', error);
+      showToast('Failed to process import files', 'error');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const clearAllData = async () => {
@@ -280,6 +617,8 @@ export default function SettingsScreen() {
               textColor="#4CAF50"
               onPress={exportPatientData}
               contentStyle={{ height: 40 }}
+              loading={isExporting}
+              disabled={isExporting || isImporting}
             >
               Export Data
             </Button>
@@ -291,7 +630,8 @@ export default function SettingsScreen() {
               textColor="#4CAF50"
               onPress={importPatientData}
               contentStyle={{ height: 40 }}
-              disabled={true}
+              loading={isImporting}
+              disabled={isExporting || isImporting}
             >
               Import Data
             </Button>

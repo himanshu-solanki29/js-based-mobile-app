@@ -96,21 +96,46 @@ class PatientStorageService extends StorageService<PatientsData> {
   async addPatient(patientData: PatientFormData): Promise<Patient> {
     await this.ensureInitialized();
     
-    const id = (Object.keys(this.patients).length + 1).toString();
+    // Create a unique ID for the new patient
+    const patientId = (Object.keys(this.patients).length + 1).toString();
     
+    // Create a new patient object
     const newPatient: Patient = {
-      ...patientData,
-      id,
-      visits: []
+      id: patientId,
+      name: patientData.name,
+      age: parseInt(patientData.age.toString()),
+      gender: patientData.gender,
+      phone: patientData.phone,
+      email: patientData.email || '',
+      height: patientData.height || '',
+      weight: patientData.weight || '',
+      bloodPressure: patientData.bloodPressure || '',
+      medicalHistory: patientData.medicalHistory || '',
+      visits: [],
+      lastVisit: ''
     };
     
+    // Add the patient to our database
+    this.patients[patientId] = newPatient;
+    
+    // Persist to storage
+    await this.persistPatients();
+    
+    return newPatient;
+  }
+  
+  // Add multiple patients at once (for import functionality)
+  async bulkAddPatients(newPatients: Record<string, Patient>): Promise<void> {
+    await this.ensureInitialized();
+    
+    // Merge new patients with existing patients
     this.patients = {
       ...this.patients,
-      [id]: newPatient
+      ...newPatients
     };
     
+    // Persist to storage
     await this.persistPatients();
-    return newPatient;
   }
   
   // Update an existing patient
