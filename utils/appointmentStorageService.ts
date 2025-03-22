@@ -2,9 +2,6 @@ import StorageService from './storageService';
 import type { Appointment, AppointmentStatus } from './appointmentStore';
 import patientStorageService from './patientStorageService';
 
-// Import only the data, not importing from appointmentStore to avoid circular dependency
-import { INITIAL_APPOINTMENTS } from './initialData';
-
 // Storage keys
 const APPOINTMENT_STORAGE_KEY = 'appointments_data';
 
@@ -327,8 +324,8 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
   async reset(): Promise<void> {
     try {
       console.log('Resetting appointment storage to initial state');
-      // Reset to initial data
-      this.appointments = INITIAL_APPOINTMENTS.slice();
+      // Reset to empty array
+      this.appointments = [];
       // Save to storage
       await this.saveData(this.appointments);
       // Notify listeners
