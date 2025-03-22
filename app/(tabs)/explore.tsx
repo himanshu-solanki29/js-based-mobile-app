@@ -16,7 +16,6 @@ import {
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import usePatientStorage from '@/utils/usePatientStorage';
-import { INITIAL_PATIENTS } from '@/utils/initialData';
 
 // Define appointment type
 type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
@@ -43,12 +42,8 @@ export default function ExploreScreen() {
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
   
-  // Filter out dummy data regardless of any setting
-  const realPatients = useMemo(() => {
-    // Filter out dummy patients (IDs 1-5)
-    const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-    return patients.filter(patient => !initialPatientIds.includes(patient.id));
-  }, [patients]);
+  // Use all patients directly without filtering dummy data
+  const realPatients = patients;
 
   // Initialize filtered patients on component mount and when patients change
   useEffect(() => {

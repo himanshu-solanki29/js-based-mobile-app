@@ -114,16 +114,16 @@ class AppointmentStorageService {
     try {
       await this.ensureInitialized();
       
-      // Generate a new ID that avoids dummy data collisions (IDs 1-7)
+      // Generate a new ID without referencing dummy data
       const existingIds = this.appointments.map(a => a.id);
       let newId;
       
-      // Start ID from 8 onwards to avoid collision with dummy data
-      let idToTry = 8;
-      do {
-        newId = idToTry.toString();
+      // Start with the next available number
+      let idToTry = 1;
+      while (existingIds.includes(idToTry.toString())) {
         idToTry++;
-      } while (existingIds.includes(newId) || DUMMY_APPOINTMENT_IDS.includes(newId));
+      }
+      newId = idToTry.toString();
       
       // Create a new appointment object with the generated ID
       const newAppointment = {

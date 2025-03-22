@@ -133,16 +133,16 @@ class PatientStorageService {
         await this.init();
       }
       
-      // Generate a new ID that avoids dummy data collisions (IDs 1-5)
+      // Generate a new ID without referencing dummy data
       const existingIds = Object.keys(this.patients);
       let newId;
       
-      // Start ID from 6 onwards to avoid collision with dummy data
-      let idToTry = 6;
-      do {
-        newId = idToTry.toString();
+      // Start with the next available number
+      let idToTry = 1;
+      while (existingIds.includes(idToTry.toString())) {
         idToTry++;
-      } while (existingIds.includes(newId) || DUMMY_PATIENT_IDS.includes(newId));
+      }
+      newId = idToTry.toString();
       
       // Create a new patient object with the generated ID
       const patientWithId = {
