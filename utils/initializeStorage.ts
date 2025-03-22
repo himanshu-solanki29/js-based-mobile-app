@@ -42,7 +42,7 @@ export const markAsLaunched = async (): Promise<void> => {
 /**
  * Initialize storage services, possibly with a forced reset
  */
-const initializeStorage = async (forceReset: boolean = false): Promise<void> => {
+export const initializeStorage = async (forceReset: boolean = false): Promise<void> => {
   try {
     // Check if this is the first launch
     const firstLaunch = await isFirstLaunch();
@@ -62,6 +62,4 @@ const initializeStorage = async (forceReset: boolean = false): Promise<void> => 
   } catch (error) {
     console.error('Error initializing storage:', error);
   }
-};
-
-export default initializeStorage; 
+}; 

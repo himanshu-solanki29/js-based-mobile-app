@@ -31,7 +31,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Patient } from '@/utils/patientStore';
 import { Appointment } from '@/utils/appointmentStore';
-import initializeStorage from '@/utils/initializeStorage';
+import { initializeStorage } from '@/utils/initializeStorage';
 import * as DocumentPicker from 'expo-document-picker';
 import { formatDate } from '@/utils/dateFormat';
 import logStorageService, { LogEntry } from '@/utils/logStorageService';

@@ -25,7 +25,8 @@ import {
   Menu,
   TouchableRipple,
   Portal,
-  useTheme
+  useTheme,
+  Avatar
 } from 'react-native-paper';
 import { MedicalRecordCard } from "@/components/MedicalRecordCard";
 import { useGlobalToast } from "@/components/GlobalToastProvider";
@@ -250,7 +251,7 @@ export default function AppointmentDetailScreen() {
                     <IconButton
                       icon="chevron-right"
                       size={20}
-                      color={theme.colors.primary}
+                      iconColor={theme.colors.primary}
                     />
                   </View>
                 </TouchableRipple>
