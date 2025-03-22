@@ -15,6 +15,66 @@ import appointmentStorageService from '@/utils/appointmentStorageService';
 import { initializeStorage } from '@/utils/initializeStorage';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import type { ToastType } from '@/components/Toast';
+import StorageService from '@/utils/storageService';
+
+// Log storage service
+const LOG_STORAGE_KEY = 'operation_logs';
+
+// Log entry type
+type LogEntry = {
+  id: string;
+  timestamp: string;
+  operation: 'import' | 'export' | 'clear';
+  status: 'success' | 'error' | 'warning';
+  details: string;
+};
+
+// Log storage service
+class LogStorageService extends StorageService<LogEntry[]> {
+  private logs: LogEntry[] = [];
+  
+  constructor() {
+    super(LOG_STORAGE_KEY);
+    this.loadLogs().catch(err => {
+      console.error('Failed to load logs:', err);
+    });
+  }
+  
+  async loadLogs() {
+    const storedLogs = await this.getData();
+    this.logs = storedLogs || [];
+  }
+  
+  async getLogs(): Promise<LogEntry[]> {
+    if (this.logs.length === 0) {
+      await this.loadLogs();
+    }
+    return [...this.logs];
+  }
+  
+  async addLog(entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
+    // Create a new log entry with id and timestamp
+    const newLog: LogEntry = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      ...entry
+    };
+    
+    // Add to local logs
+    this.logs = [newLog, ...this.logs].slice(0, 100); // Keep only last 100 logs
+    
+    // Save to storage
+    await this.saveData(this.logs);
+  }
+  
+  async clearLogs(): Promise<void> {
+    this.logs = [];
+    await this.saveData(this.logs);
+  }
+}
+
+// Create an instance of the log service
+const logStorageService = new LogStorageService();
 
 // Helper function to convert JSON to CSV string
 const jsonToCSV = (jsonData) => {
@@ -232,6 +292,9 @@ export default function SettingsScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
+  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
   const toggleSwitch = (setting: string, value: boolean) => {
     switch (setting) {
@@ -309,14 +372,29 @@ export default function SettingsScreen() {
       console.log('Filtered patients count:', filteredPatients.length);
       console.log('Filtered appointments count:', filteredAppointments.length);
       
-      // Check if we have data to export after filtering
+      // Log export activity
+      let logDetails = '';
+      let logStatus: 'success' | 'error' | 'warning' = 'success';
+      
       if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
         if (patients?.length > 0 || appointments?.length > 0) {
           showToast('Only demo data found - nothing to export', 'warning');
+          logDetails = 'Export attempted but only demo data found';
+          logStatus = 'warning';
         } else {
           showToast('No data to export', 'warning');
+          logDetails = 'Export attempted but no data found';
+          logStatus = 'warning';
         }
         setIsExporting(false);
+        
+        // Add log entry even for unsuccessful exports
+        await logStorageService.addLog({
+          operation: 'export',
+          status: logStatus,
+          details: logDetails
+        });
+        
         return;
       }
       
@@ -334,6 +412,9 @@ export default function SettingsScreen() {
       // Generate timestamp for filename
       const timestamp = new Date().toISOString().replace(/:/g, '-');
       const filename = `holistic_health_export_${timestamp}.json`;
+      
+      // Create log details string
+      logDetails = `Exported ${filteredPatients.length} patients and ${filteredAppointments.length} appointments`;
       
       if (Platform.OS === 'web') {
         // For web, download the file directly
@@ -383,9 +464,24 @@ export default function SettingsScreen() {
           showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
         }
       }
+      
+      // Add successful export log
+      await logStorageService.addLog({
+        operation: 'export',
+        status: 'success',
+        details: logDetails
+      });
+      
     } catch (error) {
       console.error('Export error:', error);
       showToast('Failed to export data: ' + (error.message || 'Unknown error'), 'error');
+      
+      // Log error
+      await logStorageService.addLog({
+        operation: 'export',
+        status: 'error',
+        details: `Export failed: ${error.message || 'Unknown error'}`
+      });
     } finally {
       setIsExporting(false);
     }
@@ -430,6 +526,14 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('Import error:', error);
       showToast('Failed to import data: ' + (error.message || 'Unknown error'), 'error');
+      
+      // Log error
+      await logStorageService.addLog({
+        operation: 'import',
+        status: 'error',
+        details: `Import failed: ${error.message || 'Unknown error'}`
+      });
+      
       setIsImporting(false);
     }
   };
@@ -653,9 +757,23 @@ export default function SettingsScreen() {
       const results = formatImportResults();
       showToast(results.message, results.type);
       
+      // Log import results
+      await logStorageService.addLog({
+        operation: 'import',
+        status: results.type === 'success' ? 'success' : (results.type === 'error' ? 'error' : 'warning'),
+        details: results.message
+      });
+      
     } catch (error) {
       console.error('Error processing import file:', error);
       showToast('Failed to process import file: ' + (error.message || 'Unknown error'), 'error');
+      
+      // Log error
+      await logStorageService.addLog({
+        operation: 'import',
+        status: 'error',
+        details: `Import processing failed: ${error.message || 'Unknown error'}`
+      });
     } finally {
       setIsImporting(false);
     }
@@ -987,21 +1105,60 @@ export default function SettingsScreen() {
           [{ text: 'OK' }]
         );
       }
+      
+      // Log data clear
+      await logStorageService.addLog({
+        operation: 'clear',
+        status: 'success',
+        details: 'All data cleared successfully'
+      });
+      
     } catch (error) {
       console.error('Failed to clear data:', error);
       showToast('Failed to clear data: ' + (error.message || 'Unknown error'), 'error');
+      
+      // Log error
+      await logStorageService.addLog({
+        operation: 'clear',
+        status: 'error',
+        details: `Data clear failed: ${error.message || 'Unknown error'}`
+      });
     } finally {
       setIsClearing(false);
     }
   };
 
-  const viewLogs = () => {
+  const viewLogs = async () => {
     setMenuVisible(false);
-    Alert.alert(
-      'Logs Feature',
-      'Import and export logs will be available in a future update.',
-      [{ text: 'OK' }]
-    );
+    setIsLoadingLogs(true);
+    
+    try {
+      const operationLogs = await logStorageService.getLogs();
+      setLogs(operationLogs);
+      setShowLogsModal(true);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+      showToast('Failed to load logs', 'error');
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+  
+  const clearLogs = async () => {
+    try {
+      await logStorageService.clearLogs();
+      setLogs([]);
+      showToast('Logs cleared successfully', 'success');
+    } catch (error) {
+      console.error('Error clearing logs:', error);
+      showToast('Failed to clear logs', 'error');
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
   };
 
   return (
@@ -1272,6 +1429,75 @@ export default function SettingsScreen() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+      
+      {/* Import/Export Logs Modal */}
+      <Portal>
+        <Modal visible={showLogsModal} onDismiss={() => setShowLogsModal(false)} contentContainerStyle={styles.logsModal}>
+          <View style={styles.logsModalHeader}>
+            <ThemedText style={styles.logsModalTitle}>Operation Logs</ThemedText>
+            <IconButton icon="close" size={20} onPress={() => setShowLogsModal(false)} />
+          </View>
+          
+          <View style={styles.logsActionButtons}>
+            <Button 
+              mode="outlined"
+              textColor="#F44336"
+              onPress={clearLogs}
+              style={styles.clearLogsButton}
+              disabled={logs.length === 0}
+            >
+              Clear Logs
+            </Button>
+          </View>
+          
+          <ScrollView style={styles.logsContainer}>
+            {isLoadingLogs ? (
+              <View style={styles.logsLoadingContainer}>
+                <ThemedText>Loading logs...</ThemedText>
+              </View>
+            ) : logs.length === 0 ? (
+              <View style={styles.emptyLogsContainer}>
+                <FontAwesome5 name="history" size={24} color="#CCCCCC" style={styles.emptyLogsIcon} />
+                <ThemedText style={styles.emptyLogsText}>No operation logs found</ThemedText>
+              </View>
+            ) : (
+              logs.map((log) => (
+                <View key={log.id} style={styles.logItem}>
+                  <View style={styles.logItemHeader}>
+                    <View style={styles.logOperation}>
+                      <FontAwesome5 
+                        name={
+                          log.operation === 'import' ? 'upload' : 
+                          log.operation === 'export' ? 'download' : 'trash'
+                        } 
+                        size={14} 
+                        color={
+                          log.operation === 'clear' ? '#F44336' :
+                          '#4CAF50'
+                        }
+                        style={styles.logIcon} 
+                      />
+                      <ThemedText style={styles.logOperationText}>
+                        {log.operation.charAt(0).toUpperCase() + log.operation.slice(1)}
+                      </ThemedText>
+                    </View>
+                    <View style={[
+                      styles.logStatus, 
+                      log.status === 'success' ? styles.statusSuccess : 
+                      log.status === 'error' ? styles.statusError : 
+                      styles.statusWarning
+                    ]}>
+                      <ThemedText style={styles.logStatusText}>{log.status}</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText style={styles.logDetails}>{log.details}</ThemedText>
+                  <ThemedText style={styles.logTimestamp}>{formatDate(log.timestamp)}</ThemedText>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </Modal>
+      </Portal>
     </ThemedView>
   );
 }
@@ -1411,5 +1637,106 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     marginTop: 40,
+  },
+  logsModal: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 16,
+    maxHeight: '80%',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  logsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  logsModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  logsActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 8,
+  },
+  clearLogsButton: {
+    borderColor: '#F44336',
+    borderRadius: 8,
+  },
+  logsContainer: {
+    padding: 8,
+    maxHeight: 500,
+  },
+  logsLoadingContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  emptyLogsContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyLogsIcon: {
+    marginBottom: 16,
+  },
+  emptyLogsText: {
+    color: '#757575',
+  },
+  logItem: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  logItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  logOperation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logOperationText: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  logIcon: {
+    marginRight: 6,
+  },
+  logStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusSuccess: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusError: {
+    backgroundColor: '#FFEBEE',
+  },
+  statusWarning: {
+    backgroundColor: '#FFF8E1',
+  },
+  logStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  logDetails: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  logTimestamp: {
+    fontSize: 12,
+    color: '#757575',
+    textAlign: 'right',
   },
 }); 
