@@ -2,7 +2,7 @@ import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useState } from 'react';
-import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph } from 'react-native-paper';
+import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph, Menu, IconButton } from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -228,7 +228,8 @@ export default function SettingsScreen() {
   const [locationServices, setLocationServices] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
   
-  // Add state for modals
+  // Add state for menu and modals
+  const [menuVisible, setMenuVisible] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
 
@@ -994,6 +995,15 @@ export default function SettingsScreen() {
     }
   };
 
+  const viewLogs = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      'Logs Feature',
+      'Import and export logs will be available in a future update.',
+      [{ text: 'OK' }]
+    );
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -1093,27 +1103,28 @@ export default function SettingsScreen() {
         
         {/* Data Management */}
         <Surface style={styles.section} elevation={1}>
-          <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <FontAwesome5 name="database" size={18} color="#4CAF50" style={styles.settingIcon} />
-              <ThemedText style={styles.settingLabel}>Auto Backup</ThemedText>
-            </View>
-            <Switch
-              value={autoBackup}
-              onValueChange={(value) => toggleSwitch('autoBackup', value)}
-              color="#4CAF50"
-            />
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
+            <Menu
+              visible={menuVisible}
+              onDismiss={() => setMenuVisible(false)}
+              anchor={
+                <IconButton
+                  icon="dots-vertical"
+                  size={20}
+                  onPress={() => setMenuVisible(true)}
+                  iconColor="#4CAF50"
+                />
+              }
+              contentStyle={styles.menuContent}
+            >
+              <Menu.Item 
+                onPress={viewLogs} 
+                title="View Import/Export Logs"
+                leadingIcon="history"
+              />
+            </Menu>
           </View>
-          
-          <View style={styles.settingDescription}>
-            <ThemedText style={styles.descriptionText}>
-              Automatically backup your data daily
-            </ThemedText>
-          </View>
-          
-          <Divider style={styles.divider} />
           
           <View style={styles.dataButtons}>
             <Button 
@@ -1141,12 +1152,6 @@ export default function SettingsScreen() {
             >
               Import Data
             </Button>
-          </View>
-          
-          <View style={styles.settingDescription}>
-            <ThemedText style={styles.descriptionText}>
-              Export will create a single file with all your data that can be imported later
-            </ThemedText>
           </View>
           
           <Divider style={styles.divider} />
@@ -1395,5 +1400,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 8,
     paddingTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 8,
+  },
+  menuContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginTop: 40,
   },
 }); 
