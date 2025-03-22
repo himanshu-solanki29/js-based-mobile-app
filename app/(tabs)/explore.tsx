@@ -1,4 +1,4 @@
-import { StyleSheet, FlatList, TouchableOpacity, View, Linking, Alert } from "react-native";
+import { StyleSheet, FlatList, TouchableOpacity, View, Linking, Alert, Platform } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { useRouter, Stack } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
@@ -320,7 +320,7 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     backgroundColor: '#f8f9fa',
   },
   header: {
