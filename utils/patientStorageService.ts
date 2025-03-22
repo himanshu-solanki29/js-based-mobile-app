@@ -95,33 +95,41 @@ class PatientStorageService extends StorageService<PatientsData> {
   async addPatient(patientData: PatientFormData & { userCreated?: boolean }): Promise<Patient> {
     await this.ensureInitialized();
     
-    // Create a unique ID for the new patient
-    const patientId = (Object.keys(this.patients).length + 1).toString();
-    
-    // Create a new patient object
-    const newPatient: Patient = {
-      id: patientId,
-      name: patientData.name,
-      age: parseInt(patientData.age.toString()),
-      gender: patientData.gender,
-      phone: patientData.phone,
-      email: patientData.email || '',
-      height: patientData.height || '',
-      weight: patientData.weight || '',
-      bloodPressure: patientData.bloodPressure || '',
-      medicalHistory: patientData.medicalHistory || '',
-      visits: [],
-      lastVisit: '',
-      userCreated: patientData.userCreated || false // Set userCreated flag based on input or default to false
-    };
-    
-    // Add the patient to our database
-    this.patients[patientId] = newPatient;
-    
-    // Persist to storage
-    await this.persistPatients();
-    
-    return newPatient;
+    try {
+      // Create a unique ID for the new patient
+      const patientId = (Object.keys(this.patients).length + 1).toString();
+      
+      // Create a new patient object
+      const newPatient: Patient = {
+        id: patientId,
+        name: patientData.name,
+        age: parseInt(patientData.age.toString()),
+        gender: patientData.gender,
+        phone: patientData.phone,
+        email: patientData.email || '',
+        height: patientData.height || '',
+        weight: patientData.weight || '',
+        bloodPressure: patientData.bloodPressure || '',
+        medicalHistory: patientData.medicalHistory || '',
+        visits: [],
+        lastVisit: '',
+        userCreated: patientData.userCreated !== undefined ? patientData.userCreated : true // Default to true
+      };
+      
+      // Add the patient to our database
+      this.patients[patientId] = newPatient;
+      
+      // Log patient creation for debugging
+      console.log(`Creating new patient with ID: ${patientId}, userCreated: ${newPatient.userCreated}`);
+      
+      // Persist to storage
+      await this.persistPatients();
+      
+      return newPatient;
+    } catch (error) {
+      console.error('Error adding patient:', error);
+      throw error;
+    }
   }
   
   // Add multiple patients at once (for import functionality)
