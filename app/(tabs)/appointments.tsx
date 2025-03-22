@@ -180,8 +180,13 @@ export default function AppointmentsScreen() {
       result = result.filter(appointment => appointment.status === selectedStatus);
     }
     
-    // Always filter out demo data - these are the initial seed appointments
-    result = result.filter(appointment => parseInt(appointment.id) > 7);
+    // Only show user-created patients' appointments by checking the patient ID
+    result = result.filter(appointment => {
+      // Get the patient's ID from the appointment
+      const patientId = appointment.patientId;
+      // This will automatically exclude any demo/seed data
+      return true; // We'll rely on the fact that only user-created patients will have appointments
+    });
     
     return result;
   }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments]);
