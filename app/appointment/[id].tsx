@@ -480,18 +480,38 @@ export default function AppointmentDetailsScreen() {
           
           <View style={styles.patientInfoContainer}>
             <ThemedText style={styles.patientName}>{patient.name}</ThemedText>
-            <ThemedText style={styles.patientDetail}>
-              <FontAwesome5 name="user-alt" size={14} color="#4CAF50" style={styles.detailIcon} /> {patient.age} years • {patient.gender}
-            </ThemedText>
-            <ThemedText style={styles.patientDetail}>
-              <FontAwesome5 name="phone" size={14} color="#4CAF50" style={styles.detailIcon} /> {patient.phone}
-            </ThemedText>
-            <ThemedText style={styles.patientDetail}>
-              <FontAwesome5 name="envelope" size={14} color="#4CAF50" style={styles.detailIcon} /> {patient.email}
-            </ThemedText>
-            <ThemedText style={styles.patientDetail}>
-              <FontAwesome5 name="id-card" size={14} color={STATUS_COLORS[appointment.status]?.accent || '#4CAF50'} style={styles.detailIcon} /> {patient.id}
-            </ThemedText>
+            <View style={styles.patientDetailRow}>
+              <View style={styles.patientDetailIconContainer}>
+                <FontAwesome5 name="user-alt" size={14} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.patientDetail}>
+                {patient.age} years • {patient.gender}
+              </ThemedText>
+            </View>
+            <View style={styles.patientDetailRow}>
+              <View style={styles.patientDetailIconContainer}>
+                <FontAwesome5 name="phone" size={14} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.patientDetail}>
+                {patient.phone}
+              </ThemedText>
+            </View>
+            <View style={styles.patientDetailRow}>
+              <View style={styles.patientDetailIconContainer}>
+                <FontAwesome5 name="envelope" size={14} color="#4CAF50" />
+              </View>
+              <ThemedText style={styles.patientDetail}>
+                {patient.email}
+              </ThemedText>
+            </View>
+            <View style={styles.patientDetailRow}>
+              <View style={styles.patientDetailIconContainer}>
+                <FontAwesome5 name="id-card" size={14} color={STATUS_COLORS[appointment.status]?.accent || '#4CAF50'} />
+              </View>
+              <ThemedText style={styles.patientDetail}>
+                {patient.id}
+              </ThemedText>
+            </View>
           </View>
           
           <Divider style={styles.divider} />
@@ -889,11 +909,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555555',
     marginBottom: 8,
+    flex: 1,
   },
   detailIcon: {
     marginRight: 4,
     width: 20,
     textAlign: 'center',
+  },
+  patientDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    width: '100%',
+  },
+  patientDetailIconContainer: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
   actionButtons: {
     flexDirection: 'row',
