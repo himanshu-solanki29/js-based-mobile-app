@@ -17,111 +17,202 @@ import { useGlobalToast } from '@/components/GlobalToastProvider';
 
 // Helper function to convert JSON to CSV string
 const jsonToCSV = (jsonData) => {
-  if (!jsonData || jsonData.length === 0) return '';
-  
-  // Get headers from keys of first object
-  const headers = Object.keys(jsonData[0]);
-  
-  // Create CSV header row
-  const csvRows = [headers.join(',')];
-  
-  // Add data rows
-  for (const item of jsonData) {
-    const values = headers.map(header => {
-      const value = item[header];
-      // Handle nested objects by stringifying them
-      const cellValue = typeof value === 'object' && value !== null 
-        ? JSON.stringify(value).replace(/"/g, '""') 
-        : value;
-      
-      // Escape commas, quotes, etc.
-      return `"${String(cellValue).replace(/"/g, '""')}"`;
-    });
-    csvRows.push(values.join(','));
+  try {
+    if (!jsonData || !Array.isArray(jsonData) || jsonData.length === 0) {
+      console.warn('Invalid or empty data passed to jsonToCSV');
+      return '';
+    }
+    
+    // Get headers from keys of first object
+    const headers = Object.keys(jsonData[0]);
+    if (headers.length === 0) {
+      console.warn('Object has no properties');
+      return '';
+    }
+    
+    console.log('CSV headers:', headers);
+    
+    // Create CSV header row
+    const csvRows = [
+      headers.map(header => `"${header.replace(/"/g, '""')}"`).join(',')
+    ];
+    
+    // Add data rows
+    for (const item of jsonData) {
+      try {
+        const values = headers.map(header => {
+          try {
+            const value = item[header];
+            let cellValue;
+            
+            // Handle different types of values
+            if (value === null || value === undefined) {
+              cellValue = '';
+            } else if (Array.isArray(value)) {
+              // Convert arrays to JSON strings
+              cellValue = JSON.stringify(value).replace(/"/g, '""');
+            } else if (typeof value === 'object') {
+              // Convert objects to JSON strings
+              cellValue = JSON.stringify(value).replace(/"/g, '""');
+            } else {
+              // Use simple string conversion for primitives
+              cellValue = String(value);
+            }
+            
+            // Escape quotes and wrap in quotes
+            return `"${cellValue.replace(/"/g, '""')}"`;
+          } catch (fieldError) {
+            console.error(`Error processing field ${header}:`, fieldError);
+            return '""'; // Return empty value on error
+          }
+        });
+        
+        csvRows.push(values.join(','));
+      } catch (rowError) {
+        console.error('Error processing row:', rowError, 'Row data:', item);
+        // Continue to next row
+      }
+    }
+    
+    // Return CSV string
+    const result = csvRows.join('\n');
+    console.log(`CSV generated successfully with ${csvRows.length - 1} data rows`);
+    return result;
+  } catch (error) {
+    console.error('Error generating CSV:', error);
+    return '';
   }
-  
-  // Return CSV string
-  return csvRows.join('\n');
 };
 
 // Helper function to parse CSV string back to JSON
 const csvToJSON = (csvString) => {
-  const lines = csvString.split('\n');
-  if (lines.length <= 1) return [];
-  
-  // Get headers from first line
-  const headers = lines[0].split(',');
-  
-  const result = [];
-  
-  // Process data rows
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue; // Skip empty lines
+  try {
+    console.log('CSV to JSON input length:', csvString.length);
     
-    const obj = {};
-    let currentIndex = 0;
+    const lines = csvString.split('\n');
+    if (lines.length <= 1) {
+      console.warn('CSV has insufficient lines:', lines.length);
+      return [];
+    }
+    
+    // Get headers from first line
+    // Try to handle quoted headers with commas inside
+    const headers = [];
+    let currentHeader = '';
     let inQuotes = false;
-    let currentValue = '';
-    let headerIndex = 0;
     
-    // Parse the line character by character to handle quoted fields with commas
-    for (let j = 0; j < lines[i].length; j++) {
-      const char = lines[i][j];
+    for (let i = 0; i < lines[0].length; i++) {
+      const char = lines[0][i];
       
       if (char === '"') {
-        // Toggle quote state
-        if (inQuotes && lines[i][j+1] === '"') {
-          // Handle escaped quotes
-          currentValue += '"';
-          j++;
+        if (inQuotes && i + 1 < lines[0].length && lines[0][i + 1] === '"') {
+          // Double quotes inside quotes are escaped quotes
+          currentHeader += '"';
+          i++;
         } else {
           inQuotes = !inQuotes;
         }
       } else if (char === ',' && !inQuotes) {
-        // End of field
-        let value = currentValue.trim();
+        headers.push(currentHeader.trim());
+        currentHeader = '';
+      } else {
+        currentHeader += char;
+      }
+    }
+    
+    // Add the last header
+    if (currentHeader.trim()) {
+      headers.push(currentHeader.trim());
+    }
+    
+    // Remove quotes from headers if they exist
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].startsWith('"') && headers[i].endsWith('"')) {
+        headers[i] = headers[i].substring(1, headers[i].length - 1).replace(/""/g, '"');
+      }
+    }
+    
+    console.log('CSV headers:', headers);
+    
+    const result = [];
+    
+    // Process data rows
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) {
+        // Skip empty lines
+        continue;
+      }
+      
+      // Parse the line using state machine to handle quoted fields with commas
+      const values = [];
+      let currentValue = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < lines[i].length; j++) {
+        const char = lines[i][j];
         
-        // Try to parse nested JSON objects
-        if (value.startsWith('{') && value.endsWith('}')) {
+        if (char === '"') {
+          if (inQuotes && j + 1 < lines[i].length && lines[i][j + 1] === '"') {
+            // Double quotes inside quotes are escaped quotes
+            currentValue += '"';
+            j++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          values.push(currentValue);
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+      
+      // Add the last value
+      values.push(currentValue);
+      
+      // Create object from headers and values
+      if (values.length === headers.length) {
+        const obj = {};
+        
+        for (let j = 0; j < headers.length; j++) {
           try {
-            value = JSON.parse(value);
-          } catch (e) {
-            // Keep as string if parsing fails
+            let value = values[j];
+            
+            // Remove surrounding quotes if present
+            if (value.startsWith('"') && value.endsWith('"')) {
+              value = value.substring(1, value.length - 1).replace(/""/g, '"');
+            }
+            
+            // Try to parse JSON objects and arrays
+            if ((value.startsWith('{') && value.endsWith('}')) || 
+                (value.startsWith('[') && value.endsWith(']'))) {
+              try {
+                obj[headers[j]] = JSON.parse(value);
+              } catch (e) {
+                console.warn(`Failed to parse JSON for field ${headers[j]}: ${e.message}`);
+                obj[headers[j]] = value;
+              }
+            } else {
+              obj[headers[j]] = value;
+            }
+          } catch (fieldError) {
+            console.error(`Error processing field ${headers[j]}:`, fieldError);
+            obj[headers[j]] = '';
           }
         }
         
-        // Assign to object using the corresponding header
-        obj[headers[headerIndex]] = value;
-        
-        // Reset for next field
-        currentValue = '';
-        headerIndex++;
+        result.push(obj);
       } else {
-        // Add character to current field value
-        currentValue += char;
+        console.warn(`Skipping row ${i}: values count (${values.length}) doesn't match headers count (${headers.length})`);
       }
     }
     
-    // Add the last field
-    if (headerIndex < headers.length) {
-      let value = currentValue.trim();
-      
-      // Try to parse nested JSON objects
-      if (value.startsWith('{') && value.endsWith('}')) {
-        try {
-          value = JSON.parse(value);
-        } catch (e) {
-          // Keep as string if parsing fails
-        }
-      }
-      
-      obj[headers[headerIndex]] = value;
-    }
-    
-    result.push(obj);
+    console.log(`CSV parsing complete. Converted ${result.length} rows`);
+    return result;
+  } catch (error) {
+    console.error('Error parsing CSV:', error);
+    return [];
   }
-  
-  return result;
 };
 
 export default function SettingsScreen() {
@@ -178,82 +269,82 @@ export default function SettingsScreen() {
       const patients = await patientStorageService.getPatients();
       const appointments = await appointmentStorageService.getAppointments();
       
-      // Create data for export
-      const exportData = {
-        patients: Object.values(patients),
-        appointments
-      };
+      console.log('Exporting patients count:', patients?.length);
+      console.log('Exporting appointments count:', appointments?.length);
       
-      // Convert to CSV
-      const patientsCSV = jsonToCSV(Object.values(patients));
-      const appointmentsCSV = jsonToCSV(appointments);
-      
-      // Create export directory if it doesn't exist
-      const exportDir = `${FileSystem.documentDirectory}exports/`;
-      const exportDirInfo = await FileSystem.getInfoAsync(exportDir);
-      
-      if (!exportDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
+      // Check if we have data to export
+      if ((!patients || patients.length === 0) && (!appointments || appointments.length === 0)) {
+        showToast('No data to export', 'warning');
+        setIsExporting(false);
+        return;
       }
       
-      // Write CSV files
+      // Create a single JSON object containing both datasets
+      const combinedData = {
+        patients: patients || [],
+        appointments: appointments || [],
+        exportDate: new Date().toISOString(),
+        appVersion: '1.0.0'
+      };
+      
+      // Convert to JSON string
+      const jsonData = JSON.stringify(combinedData, null, 2);
+      
+      // Generate timestamp for filename
       const timestamp = new Date().toISOString().replace(/:/g, '-');
-      const patientsFile = `${exportDir}patients_${timestamp}.csv`;
-      const appointmentsFile = `${exportDir}appointments_${timestamp}.csv`;
+      const filename = `holistic_health_export_${timestamp}.json`;
       
-      await FileSystem.writeAsStringAsync(patientsFile, patientsCSV);
-      await FileSystem.writeAsStringAsync(appointmentsFile, appointmentsCSV);
-      
-      // Create a zip file with both CSVs
-      const zipFile = `${FileSystem.documentDirectory}holistic_health_export_${timestamp}.zip`;
-      
-      // For simplicity, we'll just share each file separately instead of zipping
-      // Share files
       if (Platform.OS === 'web') {
-        // For web, download the files
+        // For web, download the file directly
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
         const element = document.createElement('a');
-        element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(patientsCSV));
-        element.setAttribute('download', `patients_${timestamp}.csv`);
+        element.setAttribute('href', url);
+        element.setAttribute('download', filename);
         element.style.display = 'none';
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
+        URL.revokeObjectURL(url);
         
-        // Download appointments file
-        const element2 = document.createElement('a');
-        element2.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(appointmentsCSV));
-        element2.setAttribute('download', `appointments_${timestamp}.csv`);
-        element2.style.display = 'none';
-        document.body.appendChild(element2);
-        element2.click();
-        document.body.removeChild(element2);
-        
-        showToast('Export complete. Files downloaded.', 'success');
+        showToast('Export complete. File downloaded.', 'success');
       } else {
         // For mobile platforms
-        if (await Sharing.isAvailableAsync()) {
-          // Share the patients file first
-          await Sharing.shareAsync(patientsFile, {
-            mimeType: 'text/csv',
-            dialogTitle: 'Export Patients Data',
-            UTI: 'public.comma-separated-values-text'
-          });
+        try {
+          // Create export directory if it doesn't exist
+          const exportDir = `${FileSystem.documentDirectory}exports/`;
+          const exportDirInfo = await FileSystem.getInfoAsync(exportDir);
           
-          // Then share the appointments file
-          await Sharing.shareAsync(appointmentsFile, {
-            mimeType: 'text/csv',
-            dialogTitle: 'Export Appointments Data',
-            UTI: 'public.comma-separated-values-text'
-          });
+          if (!exportDirInfo.exists) {
+            await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
+          }
           
-          showToast('Export complete', 'success');
-        } else {
-          Alert.alert('Error', 'Sharing is not available on this device');
+          // Write JSON file
+          const filePath = `${exportDir}${filename}`;
+          await FileSystem.writeAsStringAsync(filePath, jsonData);
+          
+          // Check if sharing is available
+          if (await Sharing.isAvailableAsync()) {
+            // Share the file
+            await Sharing.shareAsync(filePath, {
+              mimeType: 'application/json',
+              dialogTitle: 'Export Health Data',
+              UTI: 'public.json'
+            });
+            
+            showToast('Export complete', 'success');
+          } else {
+            Alert.alert('Error', 'Sharing is not available on this device');
+          }
+        } catch (fsError) {
+          console.error('FileSystem or Sharing error:', fsError);
+          showToast('Failed to export data: ' + (fsError.message || 'File system error'), 'error');
         }
       }
     } catch (error) {
       console.error('Export error:', error);
-      showToast('Failed to export data', 'error');
+      showToast('Failed to export data: ' + (error.message || 'Unknown error'), 'error');
     } finally {
       setIsExporting(false);
     }
@@ -267,14 +358,14 @@ export default function SettingsScreen() {
         // For web, create a file input
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv';
-        input.multiple = true; // Allow multiple files
+        input.accept = '.json,.csv';
+        input.multiple = false; // Only single file now
         input.onchange = async (event) => {
           const files = (event.target as HTMLInputElement).files;
           if (files && files.length > 0) {
-            await processImportFiles(files);
+            await processImportFile(files[0]);
           } else {
-            showToast('No files selected', 'info');
+            showToast('No file selected', 'info');
             setIsImporting(false);
           }
         };
@@ -282,8 +373,7 @@ export default function SettingsScreen() {
       } else {
         // For mobile platforms
         const result = await DocumentPicker.getDocumentAsync({
-          type: 'text/csv',
-          multiple: true,
+          type: ['application/json', 'text/csv'],
           copyToCacheDirectory: true
         });
         
@@ -293,17 +383,147 @@ export default function SettingsScreen() {
           return;
         }
         
-        // Process the selected files
-        await processImportFiles(result.assets);
+        // Process the selected file
+        await processImportFile(result.assets[0]);
       }
     } catch (error) {
       console.error('Import error:', error);
-      showToast('Failed to import data', 'error');
+      showToast('Failed to import data: ' + (error.message || 'Unknown error'), 'error');
       setIsImporting(false);
     }
   };
   
-  const processImportFiles = async (files) => {
+  const processImportFile = async (file) => {
+    try {
+      const fileName = file.name || file.uri.split('/').pop();
+      console.log('Processing file:', fileName);
+      
+      let fileContent;
+      
+      if (Platform.OS === 'web') {
+        // Read file content on web
+        fileContent = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsText(file);
+        });
+      } else {
+        // Read file content on mobile
+        fileContent = await FileSystem.readAsStringAsync(file.uri);
+      }
+      
+      console.log('File content length:', fileContent.length);
+      
+      // Determine if it's JSON or CSV
+      let importedData;
+      
+      if (fileName.endsWith('.json')) {
+        // Parse JSON data
+        try {
+          importedData = JSON.parse(fileContent);
+          console.log('Successfully parsed JSON data');
+        } catch (jsonError) {
+          console.error('Failed to parse JSON:', jsonError);
+          showToast('Invalid JSON file format', 'error');
+          setIsImporting(false);
+          return;
+        }
+      } else if (fileName.endsWith('.csv')) {
+        // For backward compatibility with old CSV exports
+        showToast('Processing CSV file...', 'info');
+        return await processLegacyCSVImport([file]);
+      } else {
+        showToast('Unsupported file format. Please use .json or .csv files.', 'error');
+        setIsImporting(false);
+        return;
+      }
+      
+      // Check if the JSON has the expected structure
+      if (!importedData || (!importedData.patients && !importedData.appointments)) {
+        showToast('Invalid data format: missing patients or appointments data', 'error');
+        setIsImporting(false);
+        return;
+      }
+      
+      // Import patients if available
+      if (importedData.patients && Array.isArray(importedData.patients) && importedData.patients.length > 0) {
+        const existingPatients = await patientStorageService.getPatients();
+        const existingPatientIds = new Set(existingPatients.map(p => p.id));
+        
+        const newPatients = {};
+        let duplicateCount = 0;
+        let addedCount = 0;
+        
+        for (const patient of importedData.patients) {
+          if (!patient || !patient.id) {
+            console.warn('Skipping invalid patient record');
+            continue;
+          }
+          
+          if (existingPatientIds.has(patient.id)) {
+            duplicateCount++;
+            continue;
+          }
+          
+          newPatients[patient.id] = patient;
+          addedCount++;
+        }
+        
+        if (addedCount > 0) {
+          await patientStorageService.bulkAddPatients(newPatients);
+          showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
+        } else if (duplicateCount > 0) {
+          showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
+        } else {
+          showToast('No valid patients found in file', 'info');
+        }
+      }
+      
+      // Import appointments if available
+      if (importedData.appointments && Array.isArray(importedData.appointments) && importedData.appointments.length > 0) {
+        const existingAppointments = await appointmentStorageService.getAppointments();
+        const existingIds = new Set(existingAppointments.map(app => app.id));
+        
+        const newAppointments = [];
+        let duplicateCount = 0;
+        let addedCount = 0;
+        
+        for (const appointment of importedData.appointments) {
+          if (!appointment || !appointment.id) {
+            console.warn('Skipping invalid appointment record');
+            continue;
+          }
+          
+          if (existingIds.has(appointment.id)) {
+            duplicateCount++;
+            continue;
+          }
+          
+          newAppointments.push(appointment);
+          addedCount++;
+        }
+        
+        if (addedCount > 0) {
+          await appointmentStorageService.bulkAddAppointments(newAppointments);
+          showToast(`Imported ${addedCount} appointments (${duplicateCount} duplicates skipped)`, 'success');
+        } else if (duplicateCount > 0) {
+          showToast(`No new appointments added. ${duplicateCount} duplicates skipped.`, 'info');
+        } else {
+          showToast('No valid appointments found in file', 'info');
+        }
+      }
+      
+      showToast('Import complete', 'success');
+    } catch (error) {
+      console.error('Error processing import file:', error);
+      showToast('Failed to process import file: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+  
+  // For backward compatibility with old CSV exports
+  const processLegacyCSVImport = async (files) => {
     try {
       let patientsFile = null;
       let appointmentsFile = null;
@@ -311,6 +531,7 @@ export default function SettingsScreen() {
       // Identify which file is which
       for (const file of files) {
         const fileName = file.name || file.uri.split('/').pop();
+        console.log('Processing CSV file:', fileName);
         if (fileName.includes('patients')) {
           patientsFile = file;
         } else if (fileName.includes('appointments')) {
@@ -334,35 +555,55 @@ export default function SettingsScreen() {
           patientsContent = await FileSystem.readAsStringAsync(patientsFile.uri);
         }
         
+        console.log('Patient file content length:', patientsContent.length);
+        
         // Parse CSV to JSON
         const importedPatients = csvToJSON(patientsContent);
+        console.log('Imported patients count:', importedPatients.length);
         
-        // Get existing patients and check for duplicates
-        const existingPatients = await patientStorageService.getPatients();
-        const newPatients = {};
-        let duplicateCount = 0;
-        let addedCount = 0;
-        
-        for (const patient of importedPatients) {
-          // Check if patient with same ID already exists
-          if (existingPatients[patient.id]) {
-            duplicateCount++;
-            continue; // Skip duplicate
+        if (importedPatients.length === 0) {
+          showToast('No valid patient data found in file', 'warning');
+        } else {
+          // Get existing patients and check for duplicates
+          const existingPatients = await patientStorageService.getPatients();
+          console.log('Existing patients count:', existingPatients.length);
+          
+          // Create map of existing patient IDs for faster lookups
+          const existingPatientIds = new Set(existingPatients.map(p => p.id));
+          
+          const newPatients = {};
+          let duplicateCount = 0;
+          let addedCount = 0;
+          
+          for (const patient of importedPatients) {
+            // Validate patient data
+            if (!patient || !patient.id) {
+              console.warn('Skipping invalid patient record:', patient);
+              continue;
+            }
+            
+            // Check if patient with same ID already exists
+            if (existingPatientIds.has(patient.id)) {
+              duplicateCount++;
+              continue; // Skip duplicate
+            }
+            
+            // Add to new patients object
+            newPatients[patient.id] = patient;
+            addedCount++;
           }
           
-          // Add to new patients object
-          newPatients[patient.id] = patient;
-          addedCount++;
-        }
-        
-        // Add new patients to storage
-        if (addedCount > 0) {
-          await patientStorageService.bulkAddPatients(newPatients);
-          showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
-        } else if (duplicateCount > 0) {
-          showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
-        } else {
-          showToast('No patients data found in file', 'info');
+          console.log(`Patient import results: ${addedCount} new, ${duplicateCount} duplicates`);
+          
+          // Add new patients to storage
+          if (addedCount > 0) {
+            await patientStorageService.bulkAddPatients(newPatients);
+            showToast(`Imported ${addedCount} patients (${duplicateCount} duplicates skipped)`, 'success');
+          } else if (duplicateCount > 0) {
+            showToast(`No new patients added. ${duplicateCount} duplicates skipped.`, 'info');
+          } else {
+            showToast('No valid patients found in file', 'info');
+          }
         }
       }
       
@@ -420,8 +661,8 @@ export default function SettingsScreen() {
         showToast('No valid data files found', 'warning');
       }
     } catch (error) {
-      console.error('Error processing import files:', error);
-      showToast('Failed to process import files', 'error');
+      console.error('Error processing import CSV files:', error);
+      showToast('Failed to process CSV files: ' + (error.message || 'Unknown error'), 'error');
     } finally {
       setIsImporting(false);
     }
@@ -620,7 +861,7 @@ export default function SettingsScreen() {
               loading={isExporting}
               disabled={isExporting || isImporting}
             >
-              Export Data
+              Export All Data
             </Button>
             
             <Button 
@@ -635,6 +876,12 @@ export default function SettingsScreen() {
             >
               Import Data
             </Button>
+          </View>
+          
+          <View style={styles.settingDescription}>
+            <ThemedText style={styles.descriptionText}>
+              Export will create a single file with all your data that can be imported later
+            </ThemedText>
           </View>
           
           <Divider style={styles.divider} />
