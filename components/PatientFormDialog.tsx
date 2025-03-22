@@ -24,7 +24,7 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
   const [formData, setFormData] = useState<PatientFormData>({
     name: "",
     age: 0,
-    gender: "Male",
+    gender: "male",
     phone: "",
     email: "",
     height: "",
@@ -32,6 +32,8 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
     bloodPressure: "",
     medicalHistory: ""
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (field: keyof PatientFormData, value: any) => {
     setFormData({
@@ -53,19 +55,25 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
     }
     
     try {
-      // Add the patient to our store
+      console.log("Creating patient with data:", formData);
+      setIsSubmitting(true);
+      
+      // Add the patient to our store with explicit userCreated flag
       const newPatient = await addPatient({
         ...formData,
         // Ensure proper format for key fields
         height: formData.height ? `${formData.height} cm` : "",
         weight: formData.weight ? `${formData.weight} kg` : "",
+        userCreated: true // Explicitly set this to true
       });
+      
+      console.log("Patient created successfully:", newPatient);
       
       // Reset form
       setFormData({
         name: "",
         age: 0,
-        gender: "Male",
+        gender: "male",
         phone: "",
         email: "",
         height: "",
@@ -81,7 +89,9 @@ export default function PatientFormDialog({ visible, onDismiss, onSuccess }: Pat
       onSuccess(newPatient.id);
     } catch (error) {
       console.error("Error adding patient:", error);
-      alert("Failed to create patient. Please try again.");
+      alert(`Failed to create patient: ${error.message || "Unknown error"}. Please try again.`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
