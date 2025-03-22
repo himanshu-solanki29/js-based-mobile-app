@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert, ActivityIndicator, Text } from "react-native";
+import { StyleSheet, View, ScrollView, TextInput as RNTextInput, Alert, ActivityIndicator, Text, Animated } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
@@ -29,6 +29,10 @@ import { AppointmentStatus } from "@/utils/types";
 import { MedicalRecordForm } from "@/components/MedicalRecordForm";
 import { MedicalRecordCard } from "@/components/MedicalRecordCard";
 import { useGlobalToast } from "@/components/GlobalToastProvider";
+import { globalEventEmitter } from '@/utils/dummyDataService';
+import useAppointmentStorage from '@/utils/useAppointmentStorage';
+import usePatientStorage from '@/utils/usePatientStorage';
+import { logStorageService } from '@/utils/logStorageService';
 
 // Define status colors for consistent styling
 const STATUS_COLORS = {
@@ -38,18 +42,18 @@ const STATUS_COLORS = {
     accent: '#4CAF50'
   },
   pending: {
-    bg: '#FFF3E0',
-    text: '#E65100',
-    accent: '#FF9800'
+    bg: '#FFF8E1',
+    text: '#F57F17',
+    accent: '#FFC107'
   },
   completed: {
     bg: '#E3F2FD',
-    text: '#0D47A1',
+    text: '#1565C0',
     accent: '#2196F3'
   },
   cancelled: {
     bg: '#FFEBEE',
-    text: '#B71C1C',
+    text: '#C62828',
     accent: '#F44336'
   }
 };
@@ -102,15 +106,13 @@ export default function AppointmentDetailsScreen() {
   const [completeDialogVisible, setCompleteDialogVisible] = useState(false);
   const [completeNotes, setCompleteNotes] = useState("");
   
-  // This effect is triggered when appointment status changes and updates all states
-  useEffect(() => {
-    if (appointment) {
-      // Reset action in progress when appointment status changes
-      setActionInProgress(false);
-    }
-  }, [appointment?.status]);
+  // Get appointment details
+  const { 
+    updateAppointmentStatus,
+    deleteAppointment
+  } = useAppointmentStorage();
   
-  // Load appointment data whenever the ID changes or when refreshKey changes
+  // Find the appointment
   useEffect(() => {
     const loadAppointment = async () => {
       if (!id || appointmentsLoading) return;
@@ -234,13 +236,34 @@ export default function AppointmentDetailsScreen() {
         
         // Show success notification
         showToast("Appointment completed successfully", "success");
+        
+        // Log the operation
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'success',
+          details: `Updated appointment #${updatedAppointment.id} status to completed with remarks: ${medicalRecordNote}`
+        });
       } else {
         console.error('Failed to complete appointment - no appointment returned');
         showToast("Failed to complete appointment. Please try again.", "error");
+        
+        // Log the error
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'error',
+          details: `Error completing appointment #${updatedAppointment?.id}: No appointment returned`
+        });
       }
     } catch (error) {
       console.error('Error completing appointment:', error);
       showToast("An error occurred while completing the appointment.", "error");
+      
+      // Log the error
+      logStorageService.addLog({
+        operation: `UPDATE_APPOINTMENT_STATUS`,
+        status: 'error',
+        details: `Error completing appointment #${updatedAppointment?.id}: ${error instanceof Error ? error.message : String(error)}`
+      });
     } finally {
       setActionInProgress(false);
       setCompleteDialogVisible(false);
@@ -248,7 +271,7 @@ export default function AppointmentDetailsScreen() {
   };
   
   // Function to handle general status change
-  const handleStatusChange = async (newStatus: AppointmentStatus, notes?: string) => {
+  const handleStatusChange = async (newStatus: AppointmentStatus, remarks?: string) => {
     // Show status change animation
     setActionInProgress(true);
     
@@ -257,7 +280,7 @@ export default function AppointmentDetailsScreen() {
       const updatedAppointment = await updateAppointmentStatus(
         appointment?.id || '',
         newStatus,
-        notes || appointment?.notes
+        remarks || appointment?.notes
       );
       
       if (updatedAppointment) {
@@ -285,13 +308,34 @@ export default function AppointmentDetailsScreen() {
         }
         
         showToast(message, "success");
+        
+        // Log the operation
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'success',
+          details: `Updated appointment #${updatedAppointment.id} status to ${newStatus}${remarks ? ` with remarks: ${remarks}` : ''}`
+        });
       } else {
         console.error('Failed to update appointment status - no appointment returned');
         showToast("Failed to update appointment status. Please try again.", "error");
+        
+        // Log the error
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'error',
+          details: `Error updating appointment #${updatedAppointment?.id}: No appointment returned`
+        });
       }
     } catch (error) {
       console.error('Error updating appointment status:', error);
       showToast("An error occurred while updating the appointment.", "error");
+      
+      // Log the error
+      logStorageService.addLog({
+        operation: `UPDATE_APPOINTMENT_STATUS`,
+        status: 'error',
+        details: `Error updating appointment #${updatedAppointment?.id}: ${error instanceof Error ? error.message : String(error)}`
+      });
     } finally {
       setActionInProgress(false);
       setStatusChangeDialogVisible(false);
@@ -329,13 +373,34 @@ export default function AppointmentDetailsScreen() {
         // Reset form state
         setCompleteDialogVisible(false);
         setCompleteNotes("");
+        
+        // Log the operation
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'success',
+          details: `Updated appointment #${updatedAppointment.id} status to completed with remarks: ${completeNotes}`
+        });
       } else {
         // Show error notification
         showToast("Failed to update appointment status", "error");
+        
+        // Log the error
+        logStorageService.addLog({
+          operation: `UPDATE_APPOINTMENT_STATUS`,
+          status: 'error',
+          details: `Error completing appointment #${updatedAppointment?.id}: No appointment returned`
+        });
       }
     } catch (error) {
       console.error('Error completing appointment:', error);
       showToast("Failed to update appointment status", "error");
+      
+      // Log the error
+      logStorageService.addLog({
+        operation: `UPDATE_APPOINTMENT_STATUS`,
+        status: 'error',
+        details: `Error completing appointment #${updatedAppointment?.id}: ${error instanceof Error ? error.message : String(error)}`
+      });
     } finally {
       setActionInProgress(false);
     }
@@ -360,6 +425,36 @@ export default function AppointmentDetailsScreen() {
     if (appointment.status === status) return false;
     
     return true;
+  };
+  
+  // Handle appointment deletion
+  const handleDeleteAppointment = async () => {
+    if (!appointment) return;
+    
+    try {
+      await deleteAppointment(appointment.id);
+      showToast('Appointment deleted successfully', 'success');
+      
+      // Log the operation
+      logStorageService.addLog({
+        operation: 'DELETE_APPOINTMENT',
+        status: 'success',
+        details: `Deleted appointment #${appointment.id}`
+      });
+      
+      // Navigate back
+      router.back();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      showToast('Failed to delete appointment', 'error');
+      
+      // Log the error
+      logStorageService.addLog({
+        operation: 'DELETE_APPOINTMENT',
+        status: 'error',
+        details: `Error deleting appointment #${appointment.id}: ${error instanceof Error ? error.message : String(error)}`
+      });
+    }
   };
   
   if (loading) {

@@ -66,9 +66,6 @@ const STATUS_COLORS = {
   }
 };
 
-// Constants
-const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
-
 export default function AppointmentsScreen() {
   const {
     appointments,
@@ -152,31 +149,6 @@ export default function AppointmentsScreen() {
   
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Load show dummy data setting
-  const [showDummyData, setShowDummyData] = useState(true);
-  
-  useEffect(() => {
-    const loadShowDummyDataSetting = async () => {
-      try {
-        let value;
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          value = localStorage.getItem(SHOW_DUMMY_DATA_KEY);
-        } else {
-          value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
-        }
-        
-        // Default to true if setting doesn't exist
-        setShowDummyData(value === null ? true : value === 'true');
-      } catch (error) {
-        console.error('Error loading show dummy data setting:', error);
-        // Default to true on error
-        setShowDummyData(true);
-      }
-    };
-    
-    loadShowDummyDataSetting();
-  }, []);
-  
   // Filter appointments based on search query, selected date/range, and status
   const filteredAppointmentsMemo = useMemo(() => {
     let result = [...appointments];
@@ -207,17 +179,8 @@ export default function AppointmentsScreen() {
       result = result.filter(appointment => appointment.status === selectedStatus);
     }
     
-    // Filter out dummy/demo data if showDummyData is false
-    if (!showDummyData) {
-      result = result.filter(appointment => {
-        // Convert ID to number and check if it's a demo/initial ID (1-7)
-        const idNumber = parseInt(appointment.id);
-        return !(idNumber >= 1 && idNumber <= 7);
-      });
-    }
-    
     return result;
-  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments, showDummyData]);
+  }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments]);
 
   // Function to format the date filter for display
   const getFormattedDateRange = () => {

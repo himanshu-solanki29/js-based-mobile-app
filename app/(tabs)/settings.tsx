@@ -1,252 +1,73 @@
-import { StyleSheet, View, TouchableOpacity, Alert, Platform, ScrollView, Modal as RNModal } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
+import { StyleSheet, View, Platform, Alert, ScrollView, Modal, TouchableWithoutFeedback, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
-import { Switch, Surface, Divider, Button, Portal, Modal, Dialog, Paragraph, Menu, IconButton } from 'react-native-paper';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { 
+  Button, 
+  Switch, 
+  Divider, 
+  Card, 
+  Title, 
+  Paragraph, 
+  Surface, 
+  TouchableRipple,
+  Avatar,
+  Text,
+  IconButton,
+  Menu,
+  Dialog,
+  Portal,
+  List,
+  TextInput,
+  Chip,
+  Modal as PaperModal
+} from 'react-native-paper';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
-import * as DocumentPicker from 'expo-document-picker';
-import { getPatientsArray } from '@/utils/patientStore';
-import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useGlobalToast } from '@/components/GlobalToastProvider';
 import patientStorageService from '@/utils/patientStorageService';
 import appointmentStorageService from '@/utils/appointmentStorageService';
-import { initializeStorage } from '@/utils/initializeStorage';
-import { useGlobalToast } from '@/components/GlobalToastProvider';
-import type { ToastType } from '@/components/Toast';
-import StorageService from '@/utils/storageService';
-import dummyDataService from '@/utils/dummyDataService';
-import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS } from '@/utils/initialData';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Patient } from '@/utils/patientStore';
+import { Appointment } from '@/utils/appointmentStore';
+import initializeStorage from '@/utils/initializeStorage';
+import * as DocumentPicker from 'expo-document-picker';
+import { formatDate } from '@/utils/dateFormat';
+import logStorageService, { LogEntry } from '@/utils/logStorageService';
 
-// Log storage service
-const LOG_STORAGE_KEY = 'operation_logs';
+// Define ToastType
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-// Constants
-const SHOW_DUMMY_DATA_KEY = '@app_config_show_dummy_data';
-
-// Log entry type
-type LogEntry = {
-  id: string;
-  timestamp: string;
-  operation: 'import' | 'export' | 'clear';
-  status: 'success' | 'error' | 'warning';
-  details: string;
-};
-
-// Log storage service
-class LogStorageService extends StorageService<LogEntry[]> {
-  private logs: LogEntry[] = [];
-  
-  constructor() {
-    super(LOG_STORAGE_KEY);
-    this.loadLogs().catch(err => {
-      console.error('Failed to load logs:', err);
-    });
-  }
-  
-  async loadLogs() {
-    const storedLogs = await this.getData();
-    this.logs = storedLogs || [];
-  }
-  
-  async getLogs(): Promise<LogEntry[]> {
-    if (this.logs.length === 0) {
-      await this.loadLogs();
-    }
-    return [...this.logs];
-  }
-  
-  async addLog(entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
-    // Create a new log entry with id and timestamp
-    const newLog: LogEntry = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      ...entry
-    };
-    
-    // Add to local logs
-    this.logs = [newLog, ...this.logs].slice(0, 100); // Keep only last 100 logs
-    
-    // Save to storage
-    await this.saveData(this.logs);
-  }
-  
-  async clearLogs(): Promise<void> {
-    this.logs = [];
-    await this.saveData(this.logs);
-  }
-}
-
-// Create an instance of the log service
-const logStorageService = new LogStorageService();
-
-// Helper function to convert JSON to CSV string
-const jsonToCSV = (jsonData) => {
+// Helper function to parse CSV
+const parseCSV = (csvString: string, delimiter = ','): any[] => {
   try {
-    if (!jsonData || !Array.isArray(jsonData) || jsonData.length === 0) {
-      console.warn('Invalid or empty data passed to jsonToCSV');
-      return '';
-    }
-    
-    // Get headers from keys of first object
-    const headers = Object.keys(jsonData[0]);
-    if (headers.length === 0) {
-      console.warn('Object has no properties');
-      return '';
-    }
-    
-    console.log('CSV headers:', headers);
-    
-    // Create CSV header row
-    const csvRows = [
-      headers.map(header => `"${header.replace(/"/g, '""')}"`).join(',')
-    ];
-    
-    // Add data rows
-    for (const item of jsonData) {
-      try {
-        const values = headers.map(header => {
-          try {
-            const value = item[header];
-            let cellValue;
-            
-            // Handle different types of values
-            if (value === null || value === undefined) {
-              cellValue = '';
-            } else if (Array.isArray(value)) {
-              // Convert arrays to JSON strings
-              cellValue = JSON.stringify(value).replace(/"/g, '""');
-            } else if (typeof value === 'object') {
-              // Convert objects to JSON strings
-              cellValue = JSON.stringify(value).replace(/"/g, '""');
-            } else {
-              // Use simple string conversion for primitives
-              cellValue = String(value);
-            }
-            
-            // Escape quotes and wrap in quotes
-            return `"${cellValue.replace(/"/g, '""')}"`;
-          } catch (fieldError) {
-            console.error(`Error processing field ${header}:`, fieldError);
-            return '""'; // Return empty value on error
-          }
-        });
-        
-        csvRows.push(values.join(','));
-      } catch (rowError) {
-        console.error('Error processing row:', rowError, 'Row data:', item);
-        // Continue to next row
-      }
-    }
-    
-    // Return CSV string
-    const result = csvRows.join('\n');
-    console.log(`CSV generated successfully with ${csvRows.length - 1} data rows`);
-    return result;
-  } catch (error) {
-    console.error('Error generating CSV:', error);
-    return '';
-  }
-};
-
-// Helper function to parse CSV string back to JSON
-const csvToJSON = (csvString) => {
-  try {
-    console.log('CSV to JSON input length:', csvString.length);
-    
-    const lines = csvString.split('\n');
-    if (lines.length <= 1) {
-      console.warn('CSV has insufficient lines:', lines.length);
+    const rows = csvString.split(/\r?\n/).filter(Boolean);
+    if (rows.length === 0) {
+      console.log('CSV is empty or has no valid rows');
       return [];
     }
     
-    // Get headers from first line
-    // Try to handle quoted headers with commas inside
-    const headers = [];
-    let currentHeader = '';
-    let inQuotes = false;
+    // Parse headers (first row)
+    const headers = rows[0].split(delimiter).map(header => header.trim());
     
-    for (let i = 0; i < lines[0].length; i++) {
-      const char = lines[0][i];
-      
-      if (char === '"') {
-        if (inQuotes && i + 1 < lines[0].length && lines[0][i + 1] === '"') {
-          // Double quotes inside quotes are escaped quotes
-          currentHeader += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        headers.push(currentHeader.trim());
-        currentHeader = '';
-      } else {
-        currentHeader += char;
-      }
-    }
-    
-    // Add the last header
-    if (currentHeader.trim()) {
-      headers.push(currentHeader.trim());
-    }
-    
-    // Remove quotes from headers if they exist
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i].startsWith('"') && headers[i].endsWith('"')) {
-        headers[i] = headers[i].substring(1, headers[i].length - 1).replace(/""/g, '"');
-      }
-    }
-    
-    console.log('CSV headers:', headers);
-    
+    // Process rows into objects
     const result = [];
-    
-    // Process data rows
-    for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) {
-        // Skip empty lines
-        continue;
-      }
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i].split(delimiter);
       
-      // Parse the line using state machine to handle quoted fields with commas
-      const values = [];
-      let currentValue = '';
-      let inQuotes = false;
-      
-      for (let j = 0; j < lines[i].length; j++) {
-        const char = lines[i][j];
-        
-        if (char === '"') {
-          if (inQuotes && j + 1 < lines[i].length && lines[i][j + 1] === '"') {
-            // Double quotes inside quotes are escaped quotes
-            currentValue += '"';
-            j++;
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (char === ',' && !inQuotes) {
-          values.push(currentValue);
-          currentValue = '';
-        } else {
-          currentValue += char;
-        }
-      }
-      
-      // Add the last value
-      values.push(currentValue);
-      
-      // Create object from headers and values
+      // Skip rows with different number of columns than headers
       if (values.length === headers.length) {
         const obj = {};
         
+        // Map values to headers
         for (let j = 0; j < headers.length; j++) {
           try {
-            let value = values[j];
+            let value = values[j].trim();
             
-            // Remove surrounding quotes if present
+            // Handle quoted values
             if (value.startsWith('"') && value.endsWith('"')) {
-              value = value.substring(1, value.length - 1).replace(/""/g, '"');
+              value = value.substring(1, value.length - 1);
             }
             
             // Try to parse JSON objects and arrays
@@ -281,6 +102,9 @@ const csvToJSON = (csvString) => {
   }
 };
 
+// Helper function for CSV to JSON conversion
+const csvToJSON = parseCSV;
+
 export default function SettingsScreen() {
   const { showToast } = useGlobalToast();
   const [isClearing, setIsClearing] = useState(false);
@@ -292,7 +116,6 @@ export default function SettingsScreen() {
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [autoBackup, setAutoBackup] = useState(true);
-  const [showDummyData, setShowDummyData] = useState(true);
   
   // Add state for menu and modals
   const [menuVisible, setMenuVisible] = useState(false);
@@ -301,22 +124,6 @@ export default function SettingsScreen() {
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-
-  // Load show dummy data setting on component mount
-  useEffect(() => {
-    const loadShowDummyDataSetting = async () => {
-      try {
-        // Use dummyDataService to load the setting
-        const showDummyData = await dummyDataService.getShowDummyDataSetting();
-        setShowDummyData(showDummyData);
-      } catch (error) {
-        console.error('Error loading show dummy data setting:', error);
-        setShowDummyData(true); // Default to true on error
-      }
-    };
-    
-    loadShowDummyDataSetting();
-  }, []);
 
   const toggleSwitch = async (setting: string, value: boolean) => {
     try {
@@ -332,26 +139,6 @@ export default function SettingsScreen() {
           setNotifications(value);
           storageKey = '@app_config_notifications';
           break;
-        case 'showDummyData':
-          setShowDummyData(value);
-          
-          // Show processing toast
-          showToast(
-            value ? 'Adding dummy data...' : 'Removing dummy data...', 
-            'info'
-          );
-          
-          // Use dummyDataService to toggle dummy data
-          await dummyDataService.toggleDummyData(value);
-          
-          // Show success toast
-          showToast(
-            value ? 'Dummy data added' : 'Dummy data removed', 
-            'success'
-          );
-          
-          // Skip the normal storage since dummyDataService handles it
-          return;
         default:
           return;
       }
@@ -382,28 +169,8 @@ export default function SettingsScreen() {
       // Get all appointments
       const appointments = await appointmentStorageService.getAppointments();
       
-      // Get dummy data setting
-      const showDummyData = await dummyDataService.getShowDummyDataSetting();
-      
-      // Filter out dummy data if the setting is disabled
-      let filteredPatients = patients;
-      let filteredAppointments = appointments;
-      
-      if (!showDummyData) {
-        // Filter out dummy patients (IDs 1-5)
-        const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-        filteredPatients = patients.filter(patient => !initialPatientIds.includes(patient.id));
-        
-        // Filter out dummy appointments (IDs 1-7)
-        const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-        filteredAppointments = appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
-        
-        console.log(`Filtered out ${patients.length - filteredPatients.length} dummy patients`);
-        console.log(`Filtered out ${appointments.length - filteredAppointments.length} dummy appointments`);
-      }
-      
-      // Check if there's any data to export after filtering
-      if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
+      // Check if there's any data to export
+      if (patients.length === 0 && appointments.length === 0) {
         showToast('No data to export', 'warning');
         
         // Add log entry for the failed export
@@ -419,10 +186,9 @@ export default function SettingsScreen() {
       
       // Create export data object
       const exportData = {
-        patients: filteredPatients,
-        appointments: filteredAppointments,
-        exportDate: new Date().toISOString(),
-        showDummyData // Include the setting to maintain state on import
+        patients: patients,
+        appointments: appointments,
+        exportDate: new Date().toISOString()
       };
       
       // Convert to JSON string
@@ -434,29 +200,22 @@ export default function SettingsScreen() {
       
       // Format export statistics for display
       const formatExportStats = () => {
-        const totalExported = filteredPatients.length + filteredAppointments.length;
-        const totalItems = patients.length + appointments.length;
-        const totalSkipped = totalItems - totalExported;
+        const totalExported = patients.length + appointments.length;
         
         // Build detailed summary
-        let summaryMessage = `Successfully exported ${totalExported} of ${totalItems} items`;
+        let summaryMessage = `Successfully exported ${totalExported} items`;
         
         // Add detail parts
         const detailParts = [];
-        if (filteredPatients.length > 0) {
-          detailParts.push(`${filteredPatients.length} patients`);
+        if (patients.length > 0) {
+          detailParts.push(`${patients.length} patients`);
         }
-        if (filteredAppointments.length > 0) {
-          detailParts.push(`${filteredAppointments.length} appointments`);
+        if (appointments.length > 0) {
+          detailParts.push(`${appointments.length} appointments`);
         }
         
         if (detailParts.length > 0) {
           summaryMessage += ` (${detailParts.join(', ')})`;
-        }
-        
-        // Add skipped items if any
-        if (totalSkipped > 0) {
-          summaryMessage += `. Skipped ${totalSkipped} demo items.`;
         }
         
         return summaryMessage;
@@ -678,16 +437,6 @@ export default function SettingsScreen() {
         showToast('Invalid data format: missing patients or appointments data', 'error');
         setIsImporting(false);
         return;
-      }
-      
-      // Get current dummy data setting
-      const currentShowDummyData = await dummyDataService.getShowDummyDataSetting();
-      
-      // Check if the import file has the dummy data setting
-      if (typeof importedData.showDummyData === 'boolean' && importedData.showDummyData !== currentShowDummyData) {
-        // Update the dummy data setting based on the imported value
-        await dummyDataService.setShowDummyDataSetting(importedData.showDummyData);
-        setShowDummyData(importedData.showDummyData);
       }
       
       // Import patients if available
@@ -1253,12 +1002,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -1386,26 +1129,6 @@ export default function SettingsScreen() {
               />
             </Menu>
           </View>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <FontAwesome5 name="database" size={18} color="#4CAF50" style={styles.settingIcon} />
-              <ThemedText style={styles.settingLabel}>Show Dummy Data</ThemedText>
-            </View>
-            <Switch
-              value={showDummyData}
-              onValueChange={(value) => toggleSwitch('showDummyData', value)}
-              color="#4CAF50"
-            />
-          </View>
-          
-          <View style={styles.settingDescription}>
-            <ThemedText style={styles.descriptionText}>
-              Display or hide sample data in your lists
-            </ThemedText>
-          </View>
-          
-          <Divider style={styles.divider} />
           
           <View style={styles.dataButtons}>
             <Button 
@@ -1556,7 +1279,7 @@ export default function SettingsScreen() {
       
       {/* Import/Export Logs Modal */}
       <Portal>
-        <Modal visible={showLogsModal} onDismiss={() => setShowLogsModal(false)} contentContainerStyle={styles.logsModal}>
+        <PaperModal visible={showLogsModal} onDismiss={() => setShowLogsModal(false)} contentContainerStyle={styles.logsModal}>
           <View style={styles.logsModalHeader}>
             <ThemedText style={styles.logsModalTitle}>Operation Logs</ThemedText>
             <IconButton icon="close" size={20} onPress={() => setShowLogsModal(false)} />
@@ -1620,7 +1343,7 @@ export default function SettingsScreen() {
               ))
             )}
           </ScrollView>
-        </Modal>
+        </PaperModal>
       </Portal>
     </ThemedView>
   );
