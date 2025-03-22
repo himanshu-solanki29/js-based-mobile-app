@@ -63,34 +63,22 @@ export default function HomeScreen() {
   
   // Filter data based on showDummyData setting
   const filteredPatients = useMemo(() => {
-    if (showDummyData) {
-      return patientsArray;
-    } else {
-      // Filter out dummy patients (IDs 1-5)
-      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
-      return patientsArray.filter(patient => !initialPatientIds.includes(patient.id));
-    }
-  }, [patientsArray, showDummyData]);
+    // Always filter out dummy patients (IDs 1-5) to only show user-created data
+    const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+    return patientsArray.filter(patient => !initialPatientIds.includes(patient.id));
+  }, [patientsArray]);
   
   const filteredAppointments = useMemo(() => {
-    if (showDummyData) {
-      return appointments;
-    } else {
-      // Filter out dummy appointments (IDs 1-7)
-      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-      return appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
-    }
-  }, [appointments, showDummyData]);
+    // Always filter out dummy appointments (IDs 1-7) to only show user-created data 
+    const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+    return appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+  }, [appointments]);
   
   const filteredUpcomingAppointments = useMemo(() => {
-    if (showDummyData) {
-      return upcomingAppointments;
-    } else {
-      // Filter out dummy appointments (IDs 1-7)
-      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
-      return upcomingAppointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
-    }
-  }, [upcomingAppointments, showDummyData]);
+    // Always filter out dummy appointments (IDs 1-7) to only show user-created data
+    const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+    return upcomingAppointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+  }, [upcomingAppointments]);
   
   // Limit upcoming appointments to maximum 6
   const limitedUpcomingAppointments = useMemo(() => {
@@ -470,18 +458,35 @@ export default function HomeScreen() {
               {limitedUpcomingAppointments.length === 0 ? (
                 <View style={styles.emptyContent}>
                   <FontAwesome5 name="calendar-check" size={32} color="#CCCCCC" />
-                  <ThemedText style={styles.emptyText}>No upcoming appointments</ThemedText>
-                  <Button 
-                    mode="outlined" 
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      router.push('/(tabs)/appointments');
-                    }}
-                    style={styles.scheduleEmptyButton}
-                    textColor="#4CAF50"
-                  >
-                    Schedule Now
-                  </Button>
+                  <ThemedText style={styles.emptyText}>No user appointments found</ThemedText>
+                  <ThemedText style={styles.emptySubText}>
+                    This screen only shows your created data. 
+                    {'\n'}Create an appointment or enable dummy data in Settings.
+                  </ThemedText>
+                  <View style={styles.emptyButtonsRow}>
+                    <Button 
+                      mode="outlined" 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push('/(tabs)/appointments');
+                      }}
+                      style={styles.emptyButton}
+                      textColor="#4CAF50"
+                    >
+                      Schedule Now
+                    </Button>
+                    <Button 
+                      mode="outlined" 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push('/settings');
+                      }}
+                      style={styles.emptyButton}
+                      textColor="#2196F3"
+                    >
+                      Enable Demo Data
+                    </Button>
+                  </View>
                 </View>
               ) : (
                 <ScrollView 
@@ -789,6 +794,7 @@ function StatCard({ value, label, icon, color }) {
   );
 }
 
+// Define styles with static color values, not dependent on theme
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1142,5 +1148,22 @@ const styles = StyleSheet.create({
   },
   appointmentItemContainer: {
     marginBottom: 8,
+  },
+  emptySubText: {
+    color: '#757575',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  emptyButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  emptyButton: {
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 8,
   },
 });
