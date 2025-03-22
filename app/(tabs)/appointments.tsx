@@ -41,7 +41,7 @@ import useAppointmentStorage from '@/utils/useAppointmentStorage';
 import { getPatientById } from '@/utils/patientStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { globalEventEmitter } from '@/utils/dummyDataService';
+import { globalEventEmitter } from '@/app/(tabs)/index';
 
 // First, define status color constants at the top of the file
 const STATUS_COLORS = {
@@ -143,35 +143,39 @@ export default function AppointmentsScreen() {
     });
   };
   
-  // Initialize with sorted appointments (filter out dummy data)
-  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>(
-    sortAppointmentsByDateDesc(
-      appointments
-        .filter(apt => apt.status === 'confirmed')
-        .filter(apt => {
-          const idNumber = parseInt(apt.id);
-          return !(idNumber >= 1 && idNumber <= 7);
-        })
-    )
-  );
+  // Initialize with sorted appointments (filter out demo data)
+  const [displayedAppointments, setDisplayedAppointments] = useState<Appointment[]>([]);
+  
+  useEffect(() => {
+    // Initialize with sorted appointments (filter out demo data)
+    if (!loading && !error) {
+      const sorted = sortAppointmentsByDateDesc(appointments);
+      setDisplayedAppointments(sorted);
+    }
+  }, [appointments, loading, error]);
+  
+  // Always filter out demo data - these are the initial seed appointments
+  const filteredDisplayedAppointments = useMemo(() => {
+    return displayedAppointments.filter(appt => parseInt(appt.id) > 7);
+  }, [displayedAppointments]);
   
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Listen for dummy data changes
+  // Setup event listeners
   useEffect(() => {
-    // Define the refresh handler
-    const handleDummyDataChange = () => {
-      console.log('AppointmentsScreen: Refreshing after dummy data change');
+    // Listen for data changes
+    const handleDataChange = () => {
+      console.log('AppointmentsScreen: Refreshing after data change');
       // Force a refresh by incrementing the refresh trigger
       setRefreshTrigger(prev => prev + 1);
     };
     
     // Add event listener
-    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
     
     // Remove event listener on cleanup
     return () => {
-      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
     };
   }, []);
   
@@ -205,12 +209,8 @@ export default function AppointmentsScreen() {
       result = result.filter(appointment => appointment.status === selectedStatus);
     }
     
-    // Always filter out dummy/demo data - remove dependency on showDummyData setting
-    result = result.filter(appointment => {
-      // Convert ID to number and check if it's a demo/initial ID (1-7)
-      const idNumber = parseInt(appointment.id);
-      return !(idNumber >= 1 && idNumber <= 7);
-    });
+    // Always filter out demo data - these are the initial seed appointments
+    result = result.filter(appointment => parseInt(appointment.id) > 7);
     
     return result;
   }, [searchQuery, selectedDate, dateRange, datePickerMode, selectedStatus, appointments]);
@@ -762,7 +762,7 @@ export default function AppointmentsScreen() {
       </View>
 
       <FlatList
-        data={filteredAppointmentsMemo}
+        data={filteredDisplayedAppointments}
         renderItem={renderAppointmentItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
@@ -828,7 +828,7 @@ export default function AppointmentsScreen() {
                     );
                     
                     // Update the filtered list
-                    setFilteredAppointments([...filteredAppointments]);
+                    setDisplayedAppointments([...displayedAppointments]);
                     
                     // Close dialog
                     setCompletionDialogVisible(false);

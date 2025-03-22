@@ -21,7 +21,7 @@ import {
   useAppointments
 } from '@/utils/appointmentStore';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
-import { globalEventEmitter } from '@/utils/dummyDataService';
+import { globalEventEmitter } from '@/app/(tabs)/index';
 
 // Mock appointment data used across the app
 // In a real app this would be in a central store/context

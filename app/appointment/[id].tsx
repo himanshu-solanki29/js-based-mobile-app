@@ -29,7 +29,7 @@ import { AppointmentStatus } from "@/utils/types";
 import { MedicalRecordForm } from "@/components/MedicalRecordForm";
 import { MedicalRecordCard } from "@/components/MedicalRecordCard";
 import { useGlobalToast } from "@/components/GlobalToastProvider";
-import { globalEventEmitter } from '@/utils/dummyDataService';
+import { globalEventEmitter } from '@/app/(tabs)/index';
 
 // Define status colors for consistent styling
 const STATUS_COLORS = {
@@ -103,21 +103,21 @@ export default function AppointmentDetailsScreen() {
   const [completeDialogVisible, setCompleteDialogVisible] = useState(false);
   const [completeNotes, setCompleteNotes] = useState("");
   
-  // Listen for dummy data changes
+  // Set up event listeners
   useEffect(() => {
     // Define the refresh handler
-    const handleDummyDataChange = () => {
-      console.log('AppointmentDetailsScreen: Refreshing after dummy data change');
+    const handleDataChange = () => {
+      console.log('AppointmentDetailsScreen: Refreshing after data change');
       // Force a refresh by incrementing the refresh key
       setRefreshKey(prev => prev + 1);
     };
     
     // Add event listener
-    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
     
     // Remove event listener on cleanup
     return () => {
-      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
     };
   }, []);
   

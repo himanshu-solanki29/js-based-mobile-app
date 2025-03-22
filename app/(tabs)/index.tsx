@@ -15,9 +15,12 @@ import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useT
 import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
 import { useGlobalToast } from "@/components/GlobalToastProvider";
-import dummyDataService, { globalEventEmitter } from "@/utils/dummyDataService";
 import { INITIAL_PATIENTS } from '@/utils/initialData';
 import { INITIAL_APPOINTMENTS } from '@/utils/initialData';
+import { EventEmitter } from 'events';
+
+// Create a global event emitter for app-wide events
+export const globalEventEmitter = new EventEmitter();
 
 // Function to get upcoming appointments is removed - we use the useAppointments hook
 
@@ -33,7 +36,6 @@ export default function HomeScreen() {
   const [completedAppointments, setCompletedAppointments] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [showDummyData, setShowDummyData] = useState(true);
   
   // For appointment actions
   const [menuVisible, setMenuVisible] = useState(false);
@@ -43,25 +45,25 @@ export default function HomeScreen() {
   const [confirmDialogVisible, setConfirmDialogVisible] = useState(false);
   const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
   
-  // Listen for dummy data changes
+  // Listen for data changes
   useEffect(() => {
     // Define the refresh handler
-    const handleDummyDataChange = () => {
-      console.log('HomeScreen: Refreshing after dummy data change');
+    const handleDataChange = () => {
+      console.log('HomeScreen: Refreshing after data change');
       // Force a refresh by incrementing the refresh trigger
       setRefreshTrigger(prev => prev + 1);
     };
     
     // Add event listener
-    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
     
     // Remove event listener on cleanup
     return () => {
-      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
     };
   }, []);
   
-  // Filter data based on showDummyData setting
+  // Filter data to only show user-created data
   const filteredPatients = useMemo(() => {
     // Always filter out dummy patients (IDs 1-5) to only show user-created data
     const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
@@ -116,22 +118,6 @@ export default function HomeScreen() {
     setCompletedAppointments(completedCount);
     
   }, [filteredAppointments, refreshTrigger]);
-  
-  // Load show dummy data setting when refresh trigger changes
-  useEffect(() => {
-    const loadShowDummyDataSetting = async () => {
-      try {
-        const showDummyDataValue = await dummyDataService.getShowDummyDataSetting();
-        console.log('HomeScreen: Loaded showDummyData setting:', showDummyDataValue);
-        setShowDummyData(showDummyDataValue);
-      } catch (error) {
-        console.error('Error loading show dummy data setting:', error);
-        setShowDummyData(false); // Default to false on error
-      }
-    };
-    
-    loadShowDummyDataSetting();
-  }, [refreshTrigger]);
   
   // Handle marking appointment as completed
   const handleCompleteAppointment = () => {
