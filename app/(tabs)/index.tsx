@@ -15,6 +15,7 @@ import { Card, Badge, Button, Avatar, Surface, Title, Divider, ProgressBar, useT
 import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
 import { useGlobalToast } from "@/components/GlobalToastProvider";
+import dummyDataService from "@/utils/dummyDataService";
 
 // Function to get upcoming appointments is removed - we use the useAppointments hook
 
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [completedAppointments, setCompletedAppointments] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showDummyData, setShowDummyData] = useState(true);
   
   // For appointment actions
   const [menuVisible, setMenuVisible] = useState(false);
@@ -70,6 +72,21 @@ export default function HomeScreen() {
     setCompletedAppointments(completedCount);
     
   }, [appointments, refreshTrigger]);
+  
+  // Load show dummy data setting
+  useEffect(() => {
+    const loadShowDummyDataSetting = async () => {
+      try {
+        const showDummyData = await dummyDataService.getShowDummyDataSetting();
+        setShowDummyData(showDummyData);
+      } catch (error) {
+        console.error('Error loading show dummy data setting:', error);
+        setShowDummyData(true); // Default to true on error
+      }
+    };
+    
+    loadShowDummyDataSetting();
+  }, []);
   
   // Handle marking appointment as completed
   const handleCompleteAppointment = () => {

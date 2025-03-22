@@ -16,6 +16,8 @@ import { initializeStorage } from '@/utils/initializeStorage';
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import type { ToastType } from '@/components/Toast';
 import StorageService from '@/utils/storageService';
+import dummyDataService from '@/utils/dummyDataService';
+import { INITIAL_PATIENTS, INITIAL_APPOINTMENTS } from '@/utils/initialData';
 
 // Log storage service
 const LOG_STORAGE_KEY = 'operation_logs';
@@ -304,84 +306,62 @@ export default function SettingsScreen() {
   useEffect(() => {
     const loadShowDummyDataSetting = async () => {
       try {
-        let value;
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          value = localStorage.getItem(SHOW_DUMMY_DATA_KEY);
-        } else {
-          value = await AsyncStorage.getItem(SHOW_DUMMY_DATA_KEY);
-        }
-        
-        // Default to true if setting doesn't exist
-        setShowDummyData(value === null ? true : value === 'true');
+        // Use dummyDataService to load the setting
+        const showDummyData = await dummyDataService.getShowDummyDataSetting();
+        setShowDummyData(showDummyData);
       } catch (error) {
         console.error('Error loading show dummy data setting:', error);
-        // Default to true on error
-        setShowDummyData(true);
+        setShowDummyData(true); // Default to true on error
       }
     };
     
     loadShowDummyDataSetting();
   }, []);
 
-  const toggleSwitch = (setting: string, value: boolean) => {
-    switch (setting) {
-      case 'notifications':
-        setNotifications(value);
-        break;
-      case 'darkMode':
-        setDarkMode(value);
-        Alert.alert(
-          'Theme Change',
-          'Dark mode will be available in a future update.',
-          [{ text: 'OK' }]
-        );
-        break;
-      case 'dataSync':
-        setDataSync(value);
-        break;
-      case 'biometricAuth':
-        setBiometricAuth(value);
-        Alert.alert(
-          'Biometric Authentication',
-          'Biometric authentication will be available in a future update.',
-          [{ text: 'OK' }]
-        );
-        break;
-      case 'locationServices':
-        setLocationServices(value);
-        break;
-      case 'autoBackup':
-        setAutoBackup(value);
-        break;
-      case 'showDummyData':
-        setShowDummyData(value);
-        // Persist the setting
-        try {
-          if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            localStorage.setItem(SHOW_DUMMY_DATA_KEY, value.toString());
-          } else {
-            AsyncStorage.setItem(SHOW_DUMMY_DATA_KEY, value.toString());
-          }
+  const toggleSwitch = async (setting: string, value: boolean) => {
+    try {
+      let storageKey: string;
+      
+      // Handle different settings
+      switch (setting) {
+        case 'darkMode':
+          setDarkMode(value);
+          storageKey = '@app_config_dark_mode';
+          break;
+        case 'notifications':
+          setNotifications(value);
+          storageKey = '@app_config_notifications';
+          break;
+        case 'showDummyData':
+          setShowDummyData(value);
           
-          // Show toast to confirm setting was saved
+          // Use dummyDataService to manage dummy data
+          await dummyDataService.setShowDummyDataSetting(value);
+          
+          // Show success toast
           showToast(
-            value 
-              ? 'Dummy data will be displayed' 
-              : 'Dummy data will be hidden',
-            'info'
+            value ? 'Dummy data shown' : 'Dummy data hidden', 
+            'success'
           );
           
-          // Log the setting change
-          logStorageService.addLog({
-            operation: 'export',
-            status: 'success',
-            details: `Changed show dummy data setting to: ${value ? 'Show' : 'Hide'}`
-          });
-        } catch (error) {
-          console.error('Error saving show dummy data setting:', error);
-          showToast('Failed to save setting', 'error');
-        }
-        break;
+          // Skip the normal storage since dummyDataService handles it
+          return;
+        default:
+          return;
+      }
+      
+      // Store setting
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, JSON.stringify(value));
+      } else {
+        await AsyncStorage.setItem(storageKey, JSON.stringify(value));
+      }
+      
+      // Show toast
+      showToast(`${setting} ${value ? 'enabled' : 'disabled'}`, 'success');
+    } catch (error) {
+      console.error('Error toggling switch:', error);
+      showToast('Error saving setting', 'error');
     }
   };
 
@@ -390,112 +370,42 @@ export default function SettingsScreen() {
       setIsExporting(true);
       showToast('Preparing data for export...', 'info');
       
-      // Export statistics
-      const stats = {
-        patients: {
-          total: 0,
-          exported: 0,
-          skipped: 0
-        },
-        appointments: {
-          total: 0,
-          exported: 0,
-          skipped: 0
-        }
-      };
-      
-      // Get all data to export
+      // Get all patients
       const patients = await patientStorageService.getPatients();
+      
+      // Get all appointments
       const appointments = await appointmentStorageService.getAppointments();
       
-      stats.patients.total = patients?.length || 0;
-      stats.appointments.total = appointments?.length || 0;
+      // Get dummy data setting
+      const showDummyData = await dummyDataService.getShowDummyDataSetting();
       
-      console.log('Original patients count:', stats.patients.total);
-      console.log('Original appointments count:', stats.appointments.total);
+      // Filter out dummy data if the setting is disabled
+      let filteredPatients = patients;
+      let filteredAppointments = appointments;
       
-      // Filter out dummy/initial data (IDs 1-5 are typically initial patients)
-      const filteredPatients = patients?.filter(patient => {
-        // Convert ID to number and check if it's a demo/initial ID (1-5)
-        const idNumber = parseInt(patient.id);
-        // Check if this is likely a demo patient based on ID and/or email domain
-        const isDemoPatient = 
-          (idNumber >= 1 && idNumber <= 5) || 
-          (patient.email && patient.email.includes('example.com'));
+      if (!showDummyData) {
+        // Filter out dummy patients (IDs 1-5)
+        const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+        filteredPatients = patients.filter(patient => !initialPatientIds.includes(patient.id));
         
-        // Count skipped patients
-        if (isDemoPatient) {
-          stats.patients.skipped++;
-        } else {
-          stats.patients.exported++;
-        }
+        // Filter out dummy appointments (IDs 1-7)
+        const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+        filteredAppointments = appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
         
-        console.log(`Patient ${patient.id} (${patient.name}) is demo: ${isDemoPatient}`);
-        return !isDemoPatient;
-      }) || [];
-      
-      // Filter out dummy/initial appointments (IDs 1-7 are typically initial appointments)
-      const filteredAppointments = appointments?.filter(appointment => {
-        // Convert ID to number and check if it's a demo/initial ID (1-7)
-        const idNumber = parseInt(appointment.id);
-        
-        // Check if this appointment is for a demo patient
-        const isForDemoPatient = filteredPatients.findIndex(p => p.id === appointment.patientId) === -1;
-        
-        // Check if it's a demo appointment based on ID or patient
-        const isDemoAppointment = (idNumber >= 1 && idNumber <= 7) || isForDemoPatient;
-        
-        // Count skipped appointments
-        if (isDemoAppointment) {
-          stats.appointments.skipped++;
-        } else {
-          stats.appointments.exported++;
-        }
-        
-        console.log(`Appointment ${appointment.id} for patient ${appointment.patientId} is demo: ${isDemoAppointment}`);
-        
-        return !isDemoAppointment;
-      }) || [];
-      
-      console.log('Export statistics:', stats);
-      
-      // Log export activity
-      let logDetails = '';
-      let logStatus: 'success' | 'error' | 'warning' = 'success';
-      
-      if (filteredPatients.length === 0 && filteredAppointments.length === 0) {
-        if (patients?.length > 0 || appointments?.length > 0) {
-          showToast('Only demo data found - nothing to export', 'warning');
-          logDetails = 'Export attempted but only demo data found';
-          logStatus = 'warning';
-        } else {
-          showToast('No data to export', 'warning');
-          logDetails = 'Export attempted but no data found';
-          logStatus = 'warning';
-        }
-        setIsExporting(false);
-        
-        // Add log entry even for unsuccessful exports
-        await logStorageService.addLog({
-          operation: 'export',
-          status: logStatus,
-          details: logDetails
-        });
-        
-        return;
+        console.log(`Filtered out ${patients.length - filteredPatients.length} dummy patients`);
+        console.log(`Filtered out ${appointments.length - filteredAppointments.length} dummy appointments`);
       }
       
-      // Create a single JSON object containing both datasets
-      const combinedData = {
+      // Create export data object
+      const exportData = {
         patients: filteredPatients,
         appointments: filteredAppointments,
         exportDate: new Date().toISOString(),
-        appVersion: '1.0.0',
-        stats: stats
+        showDummyData // Include the setting to maintain state on import
       };
       
       // Convert to JSON string
-      const jsonData = JSON.stringify(combinedData, null, 2);
+      const jsonData = JSON.stringify(exportData, null, 2);
       
       // Generate timestamp for filename
       const timestamp = new Date().toISOString().replace(/:/g, '-');
@@ -503,20 +413,20 @@ export default function SettingsScreen() {
       
       // Format export statistics for display
       const formatExportStats = () => {
-        const totalExported = stats.patients.exported + stats.appointments.exported;
-        const totalItems = stats.patients.total + stats.appointments.total;
-        const totalSkipped = stats.patients.skipped + stats.appointments.skipped;
+        const totalExported = filteredPatients.length + filteredAppointments.length;
+        const totalItems = patients.length + appointments.length;
+        const totalSkipped = totalItems - totalExported;
         
         // Build detailed summary
         let summaryMessage = `Successfully exported ${totalExported} of ${totalItems} items`;
         
         // Add detail parts
         const detailParts = [];
-        if (stats.patients.exported > 0) {
-          detailParts.push(`${stats.patients.exported} patients`);
+        if (filteredPatients.length > 0) {
+          detailParts.push(`${filteredPatients.length} patients`);
         }
-        if (stats.appointments.exported > 0) {
-          detailParts.push(`${stats.appointments.exported} appointments`);
+        if (filteredAppointments.length > 0) {
+          detailParts.push(`${filteredAppointments.length} appointments`);
         }
         
         if (detailParts.length > 0) {
@@ -532,7 +442,7 @@ export default function SettingsScreen() {
       };
       
       // Create log details string
-      logDetails = formatExportStats();
+      const logDetails = formatExportStats();
       
       if (Platform.OS === 'web') {
         // For web, download the file directly
@@ -747,6 +657,16 @@ export default function SettingsScreen() {
         showToast('Invalid data format: missing patients or appointments data', 'error');
         setIsImporting(false);
         return;
+      }
+      
+      // Get current dummy data setting
+      const currentShowDummyData = await dummyDataService.getShowDummyDataSetting();
+      
+      // Check if the import file has the dummy data setting
+      if (typeof importedData.showDummyData === 'boolean' && importedData.showDummyData !== currentShowDummyData) {
+        // Update the dummy data setting based on the imported value
+        await dummyDataService.setShowDummyDataSetting(importedData.showDummyData);
+        setShowDummyData(importedData.showDummyData);
       }
       
       // Import patients if available
