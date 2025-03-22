@@ -236,9 +236,9 @@ export default function SettingsScreen() {
           
           <View style={styles.aboutContent}>
             <FontAwesome5 name="stethoscope" size={32} color="#4CAF50" style={styles.aboutIcon} />
-            <ThemedText style={styles.appName}>HealthTrack Pro</ThemedText>
+            <ThemedText style={styles.appName}>Holistic Health Care</ThemedText>
             <ThemedText style={styles.appVersion}>Version 1.0.0</ThemedText>
-            <ThemedText style={styles.copyright}>© 2023 HealthTrack Systems</ThemedText>
+            <ThemedText style={styles.copyright}>© 2025 Holistic Health Care Systems</ThemedText>
           </View>
           
           <Divider style={styles.divider} />
