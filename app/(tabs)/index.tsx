@@ -2,7 +2,7 @@ import { StyleSheet, View, TouchableOpacity, ScrollView, FlatList, Pressable, Re
 import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useRouter } from "expo-router";
 import { formatDate } from "@/utils/dateFormat";
@@ -16,6 +16,8 @@ import { usePatients } from '@/utils/patientStore';
 import { Appointment } from '../../utils/appointmentStore';
 import { useGlobalToast } from "@/components/GlobalToastProvider";
 import dummyDataService from "@/utils/dummyDataService";
+import { INITIAL_PATIENTS } from '@/utils/initialData';
+import { INITIAL_APPOINTMENTS } from '@/utils/initialData';
 
 // Function to get upcoming appointments is removed - we use the useAppointments hook
 
@@ -41,6 +43,37 @@ export default function HomeScreen() {
   const [confirmDialogVisible, setConfirmDialogVisible] = useState(false);
   const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
   
+  // Filter data based on showDummyData setting
+  const filteredPatients = useMemo(() => {
+    if (showDummyData) {
+      return patientsArray;
+    } else {
+      // Filter out dummy patients (IDs 1-5)
+      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+      return patientsArray.filter(patient => !initialPatientIds.includes(patient.id));
+    }
+  }, [patientsArray, showDummyData]);
+  
+  const filteredAppointments = useMemo(() => {
+    if (showDummyData) {
+      return appointments;
+    } else {
+      // Filter out dummy appointments (IDs 1-7)
+      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+      return appointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+    }
+  }, [appointments, showDummyData]);
+  
+  const filteredUpcomingAppointments = useMemo(() => {
+    if (showDummyData) {
+      return upcomingAppointments;
+    } else {
+      // Filter out dummy appointments (IDs 1-7)
+      const initialAppointmentIds = INITIAL_APPOINTMENTS.map(appointment => appointment.id);
+      return upcomingAppointments.filter(appointment => !initialAppointmentIds.includes(appointment.id));
+    }
+  }, [upcomingAppointments, showDummyData]);
+  
   // Pull-to-refresh handler
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -48,7 +81,7 @@ export default function HomeScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
   
-  // Calculate dashboard statistics
+  // Calculate dashboard statistics with filtered data
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const weekStart = new Date();
@@ -56,22 +89,22 @@ export default function HomeScreen() {
     const weekStartStr = weekStart.toISOString().split('T')[0];
     
     // Today's appointments
-    const todayCount = appointments.filter(a => a.date === today).length;
+    const todayCount = filteredAppointments.filter(a => a.date === today).length;
     setTodayAppointments(todayCount);
     
     // This week's appointments 
-    const weekCount = appointments.filter(a => a.date >= weekStartStr).length;
+    const weekCount = filteredAppointments.filter(a => a.date >= weekStartStr).length;
     setWeekAppointments(weekCount);
     
     // Pending appointments
-    const pendingCount = appointments.filter(a => a.status === 'pending').length;
+    const pendingCount = filteredAppointments.filter(a => a.status === 'pending').length;
     setPendingAppointments(pendingCount);
     
     // Completed appointments
-    const completedCount = appointments.filter(a => a.status === 'completed').length;
+    const completedCount = filteredAppointments.filter(a => a.status === 'completed').length;
     setCompletedAppointments(completedCount);
     
-  }, [appointments, refreshTrigger]);
+  }, [filteredAppointments, refreshTrigger]);
   
   // Load show dummy data setting
   useEffect(() => {
@@ -96,7 +129,7 @@ export default function HomeScreen() {
     setMenuVisible(false);
     
     // Find the appointment in the mock data
-    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
+    const index = filteredAppointments.findIndex(a => a.id === selectedAppointment.id);
     if (index !== -1) {
       // Update the status with remarks if provided
       updateAppointmentStatus(selectedAppointment.id, 'completed', completionRemarks || undefined);
@@ -121,8 +154,8 @@ export default function HomeScreen() {
     setMenuVisible(false);
     
     // Find the appointment in the mock data
-    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
-    if (index !== -1 && appointments[index].status === 'pending') {
+    const index = filteredAppointments.findIndex(a => a.id === selectedAppointment.id);
+    if (index !== -1 && filteredAppointments[index].status === 'pending') {
       // Update the status
       updateAppointmentStatus(selectedAppointment.id, 'confirmed');
       
@@ -145,8 +178,8 @@ export default function HomeScreen() {
     setMenuVisible(false);
     
     // Find the appointment in the mock data
-    const index = appointments.findIndex(a => a.id === selectedAppointment.id);
-    if (index !== -1 && appointments[index].status === 'pending') {
+    const index = filteredAppointments.findIndex(a => a.id === selectedAppointment.id);
+    if (index !== -1 && filteredAppointments[index].status === 'pending') {
       // Update the status
       updateAppointmentStatus(selectedAppointment.id, 'cancelled');
       
@@ -357,7 +390,7 @@ export default function HomeScreen() {
             <View>
               <View style={styles.statsRow}>
                 <StatCard 
-                  value={patientsArray.length.toString()} 
+                  value={filteredPatients.length.toString()} 
                   label="Patients"
                   icon="users"
                   color="#4CAF50"
@@ -410,7 +443,7 @@ export default function HomeScreen() {
                 </Button>
           </View>
           
-              {upcomingAppointments.length === 0 ? (
+              {filteredUpcomingAppointments.length === 0 ? (
                 <View style={styles.emptyContent}>
                   <FontAwesome5 name="calendar-check" size={32} color="#CCCCCC" />
                   <ThemedText style={styles.emptyText}>No upcoming appointments</ThemedText>
@@ -427,7 +460,7 @@ export default function HomeScreen() {
                   </Button>
                 </View>
               ) : (
-                upcomingAppointments.map((item, index) => (
+                filteredUpcomingAppointments.map((item, index) => (
                   <View key={item.id}>
                     {index > 0 && <Divider style={styles.appointmentDivider} />}
                     <AppointmentItem item={item} />
@@ -453,19 +486,19 @@ export default function HomeScreen() {
                 <View style={styles.mainStatBlock}>
                   <ThemedText style={styles.statLabel}>Patients</ThemedText>
                   <View style={styles.statValueRow}>
-                    <ThemedText style={styles.statValue}>{patientsArray.length}</ThemedText>
-                    <ThemedText style={styles.statChange}>{patientsArray.length > 0 ? `+${Math.min(5, patientsArray.length)}` : '0'}</ThemedText>
+                    <ThemedText style={styles.statValue}>{filteredPatients.length}</ThemedText>
+                    <ThemedText style={styles.statChange}>{filteredPatients.length > 0 ? `+${Math.min(5, filteredPatients.length)}` : '0'}</ThemedText>
                   </View>
-                  <ProgressBar progress={patientsArray.length / 100} color="#4CAF50" style={styles.progressBar} />
+                  <ProgressBar progress={filteredPatients.length / 100} color="#4CAF50" style={styles.progressBar} />
                 </View>
                 
                 <View style={styles.mainStatBlock}>
                   <ThemedText style={styles.statLabel}>Appointments</ThemedText>
                   <View style={styles.statValueRow}>
-                    <ThemedText style={styles.statValue}>{appointments.length}</ThemedText>
-                    <ThemedText style={styles.statChange}>{appointments.length > 0 ? `+${Math.min(2, appointments.length)}` : '0'}</ThemedText>
+                    <ThemedText style={styles.statValue}>{filteredAppointments.length}</ThemedText>
+                    <ThemedText style={styles.statChange}>{filteredAppointments.length > 0 ? `+${Math.min(2, filteredAppointments.length)}` : '0'}</ThemedText>
                   </View>
-                  <ProgressBar progress={appointments.length / 100} color="#2196F3" style={styles.progressBar} />
+                  <ProgressBar progress={filteredAppointments.length / 100} color="#2196F3" style={styles.progressBar} />
                 </View>
               </View>
 
@@ -478,8 +511,8 @@ export default function HomeScreen() {
                     <ThemedText style={styles.smallStatLabel}>Completion Rate</ThemedText>
                     <View style={styles.statsIndicator}>
                       <ThemedText style={styles.smallStatValue}>
-                        {appointments.length > 0 
-                          ? Math.round((completedAppointments / appointments.length) * 100) 
+                        {filteredAppointments.length > 0 
+                          ? Math.round((completedAppointments / filteredAppointments.length) * 100) 
                           : 0}%
                       </ThemedText>
                       <View style={styles.indicatorBar}>
@@ -487,8 +520,8 @@ export default function HomeScreen() {
                           style={[
                             styles.indicatorFill, 
                             { 
-                              width: `${appointments.length > 0 
-                                ? Math.round((completedAppointments / appointments.length) * 100) 
+                              width: `${filteredAppointments.length > 0 
+                                ? Math.round((completedAppointments / filteredAppointments.length) * 100) 
                                 : 0}%`,
                               backgroundColor: '#00C853'
                             }
@@ -502,8 +535,8 @@ export default function HomeScreen() {
                     <ThemedText style={styles.smallStatLabel}>Cancellation Rate</ThemedText>
                     <View style={styles.statsIndicator}>
                       <ThemedText style={styles.smallStatValue}>
-                        {appointments.length > 0 
-                          ? Math.round((appointments.filter(a => a.status === 'cancelled').length / appointments.length) * 100) 
+                        {filteredAppointments.length > 0 
+                          ? Math.round((filteredAppointments.filter(a => a.status === 'cancelled').length / filteredAppointments.length) * 100) 
                           : 0}%
                       </ThemedText>
                       <View style={styles.indicatorBar}>
@@ -511,8 +544,8 @@ export default function HomeScreen() {
                           style={[
                             styles.indicatorFill, 
                             { 
-                              width: `${appointments.length > 0 
-                                ? Math.round((appointments.filter(a => a.status === 'cancelled').length / appointments.length) * 100) 
+                              width: `${filteredAppointments.length > 0 
+                                ? Math.round((filteredAppointments.filter(a => a.status === 'cancelled').length / filteredAppointments.length) * 100) 
                                 : 0}%`,
                               backgroundColor: '#F44336'
                             }
@@ -531,14 +564,14 @@ export default function HomeScreen() {
                         <View style={[styles.indicatorDot, { backgroundColor: '#4CAF50' }]} />
                         <ThemedText style={styles.indicatorLabel}>New</ThemedText>
                         <ThemedText style={styles.indicatorValue}>
-                          {Math.round(appointments.length * 0.3)}
+                          {Math.round(filteredAppointments.length * 0.3)}
                         </ThemedText>
                       </View>
                       <View style={styles.doubleIndicatorRow}>
                         <View style={[styles.indicatorDot, { backgroundColor: '#2196F3' }]} />
                         <ThemedText style={styles.indicatorLabel}>Returning</ThemedText>
                         <ThemedText style={styles.indicatorValue}>
-                          {Math.round(appointments.length * 0.7)}
+                          {Math.round(filteredAppointments.length * 0.7)}
                         </ThemedText>
                       </View>
                     </View>

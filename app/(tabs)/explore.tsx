@@ -3,7 +3,7 @@ import { Colors } from "@/constants/Colors";
 import { useRouter, Stack } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { formatDate } from "@/utils/dateFormat";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
@@ -16,6 +16,8 @@ import {
 import PatientFormDialog from "@/components/PatientFormDialog";
 import { useGlobalToast } from '@/components/GlobalToastProvider';
 import usePatientStorage from '@/utils/usePatientStorage';
+import dummyDataService from "@/utils/dummyDataService";
+import { INITIAL_PATIENTS } from '@/utils/initialData';
 
 // Mock appointment data for adding new appointments
 const MOCK_APPOINTMENTS = [
@@ -55,25 +57,52 @@ export default function ExploreScreen() {
   const [isPatientFormVisible, setPatientFormVisible] = useState(false);
   const [addPatientDialogVisible, setAddPatientDialogVisible] = useState(false);
   const { showToast } = useGlobalToast();
-
-  // Initialize filtered patients on component mount and when patients change
+  const [showDummyData, setShowDummyData] = useState(true);
+  
+  // Load dummy data setting
   useEffect(() => {
-    setFilteredPatients(patients);
-  }, [patients]);
+    const loadShowDummyDataSetting = async () => {
+      try {
+        const showDummyData = await dummyDataService.getShowDummyDataSetting();
+        setShowDummyData(showDummyData);
+      } catch (error) {
+        console.error('Error loading show dummy data setting:', error);
+        setShowDummyData(true); // Default to true on error
+      }
+    };
+    
+    loadShowDummyDataSetting();
+  }, []);
+  
+  // Filter out dummy data if needed
+  const filteredByDummyDataSetting = useMemo(() => {
+    if (showDummyData) {
+      return patients;
+    } else {
+      // Filter out dummy patients (IDs 1-5)
+      const initialPatientIds = Object.keys(INITIAL_PATIENTS).map(id => id);
+      return patients.filter(patient => !initialPatientIds.includes(patient.id));
+    }
+  }, [patients, showDummyData]);
+
+  // Initialize filtered patients on component mount and when patients or dummy data setting changes
+  useEffect(() => {
+    setFilteredPatients(filteredByDummyDataSetting);
+  }, [filteredByDummyDataSetting]);
 
   // Filter patients based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredPatients(patients);
+      setFilteredPatients(filteredByDummyDataSetting);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = patients.filter(patient => 
+      const filtered = filteredByDummyDataSetting.filter(patient => 
         patient.name.toLowerCase().includes(query) ||
         patient.phone.includes(query)
       );
       setFilteredPatients(filtered);
     }
-  }, [searchQuery, patients]);
+  }, [searchQuery, filteredByDummyDataSetting]);
 
   const handleScheduleAppointment = async (appointmentData: {
     date: Date;
