@@ -521,131 +521,133 @@ export default function PatientDetailsScreen() {
             <Text style={styles.appointmentListHeader}>Past Appointments</Text>
             
             {pastAppointments.length > 0 ? (
-              pastAppointments
-                .slice(0, 3)
-                .map((appointment, index) => (
-                  <Surface 
-                    key={appointment.id} 
-                    style={[
-                      styles.appointmentCard, 
-                      { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#2196F3' }
-                    ]} 
-                    elevation={2}
-                  >
-                    <View style={styles.appointmentCardContent}>
-                      <View style={[
-                        styles.dateIndicator,
-                        { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
-                      ]}>
-                        <Text style={[
-                          styles.dateDay,
-                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                        ]}>
-                          {new Date(appointment.date).getDate()}
-                        </Text>
-                        <Text style={[
-                          styles.dateMonth,
-                          { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                        ]}>
-                          {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
-                        </Text>
-                      </View>
-                      
-                      <View style={styles.appointmentInfo}>
-                        <View style={styles.appointmentMainInfo}>
-                          <Text style={styles.appointmentReason}>{appointment.reason}</Text>
-                          <Text style={styles.appointmentTime}>
-                            <FontAwesome5 
-                              name="clock" 
-                              size={12} 
-                              color="#757575" 
-                              style={{marginRight: 4}}
-                            /> {appointment.time}
-                          </Text>
+              <>
+                <ScrollView 
+                  horizontal={false} 
+                  style={styles.pastAppointmentsScroll}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
+                  {pastAppointments
+                    .map((appointment, index) => (
+                      <Surface 
+                        key={appointment.id} 
+                        style={[
+                          styles.appointmentCard, 
+                          { borderLeftWidth: 4, borderLeftColor: STATUS_COLORS[appointment.status]?.accent || '#2196F3' }
+                        ]} 
+                        elevation={2}
+                      >
+                        <View style={styles.appointmentCardContent}>
+                          <View style={[
+                            styles.dateIndicator,
+                            { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                          ]}>
+                            <Text style={[
+                              styles.dateDay,
+                              { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                            ]}>
+                              {new Date(appointment.date).getDate()}
+                            </Text>
+                            <Text style={[
+                              styles.dateMonth,
+                              { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                            ]}>
+                              {new Date(appointment.date).toLocaleString('default', { month: 'short' })}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.appointmentInfo}>
+                            <View style={styles.appointmentMainInfo}>
+                              <Text style={styles.appointmentReason}>{appointment.reason}</Text>
+                              <Text style={styles.appointmentTime}>
+                                <FontAwesome5 
+                                  name="clock" 
+                                  size={12} 
+                                  color="#757575" 
+                                  style={{marginRight: 4}}
+                                /> {appointment.time}
+                              </Text>
+                            </View>
+                            
+                            <View style={[
+                              styles.appointmentStatus,
+                              { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
+                            ]}>
+                              <Text style={[
+                                styles.statusText,
+                                { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
+                              ]}>
+                                {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
                         
-                        <View style={[
-                          styles.appointmentStatus,
-                          { backgroundColor: STATUS_COLORS[appointment.status]?.bg || STATUS_COLORS.completed.bg }
-                        ]}>
-                          <Text style={[
-                            styles.statusText,
-                            { color: STATUS_COLORS[appointment.status]?.text || STATUS_COLORS.completed.text }
-                          ]}>
-                            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    
-                    {appointment.status === 'completed' && (
-                      <>
-                        <Divider style={styles.recordDivider} />
-                        <View style={styles.medicalRecordSection}>
-                          <Text style={styles.medicalRecordSectionTitle}>
-                            <FontAwesome5 name="notes-medical" size={12} color={STATUS_COLORS[appointment.status]?.accent || "#2196F3"} style={{marginRight: 6}} />
-                            Medical Record
-                          </Text>
-                          
-                          {appointment.notes ? (
-                            <View style={styles.recordItemsGrid}>
-                              {/* Extract medical record details from notes */}
-                              {(() => {
-                                // Try to parse medical record from appointment notes
-                                const noteLines = appointment.notes.split('\n');
-                                const recordItems = [];
-                                
-                                // Add common items even if not found
-                                const recordMap = {
-                                  'Complaint': '',
-                                  'Diagnosis': '',
-                                  'Blood Pressure': '',
-                                  'Prescription': ''
-                                };
-                                
-                                // Extract data from notes
-                                noteLines.forEach(line => {
-                                  Object.keys(recordMap).forEach(key => {
-                                    if (line.includes(`${key}:`)) {
-                                      recordMap[key] = line.split(`${key}:`)[1]?.trim() || 'Not recorded';
-                                    }
-                                  });
-                                });
-                                
-                                // Create items for display
-                                return Object.entries(recordMap).map(([key, value], idx) => (
-                                  <View key={idx} style={styles.recordItem}>
-                                    <Text style={styles.recordItemLabel}>{key}</Text>
-                                    <Text style={styles.recordItemValue}>{value || 'Not recorded'}</Text>
-                                  </View>
-                                ));
-                              })()}
+                        {appointment.status === 'completed' && (
+                          <>
+                            <Divider style={styles.recordDivider} />
+                            <View style={styles.medicalRecordSection}>
+                              <Text style={styles.medicalRecordSectionTitle}>
+                                <FontAwesome5 name="notes-medical" size={12} color={STATUS_COLORS[appointment.status]?.accent || "#2196F3"} style={{marginRight: 6}} />
+                                Medical Record
+                              </Text>
+                              
+                              {appointment.notes ? (
+                                <View style={styles.recordItemsGrid}>
+                                  {/* Extract medical record details from notes */}
+                                  {(() => {
+                                    // Try to parse medical record from appointment notes
+                                    const noteLines = appointment.notes.split('\n');
+                                    const recordItems = [];
+                                    
+                                    // Add common items even if not found
+                                    const recordMap = {
+                                      'Complaint': '',
+                                      'Diagnosis': '',
+                                      'Blood Pressure': '',
+                                      'Prescription': ''
+                                    };
+                                    
+                                    // Extract data from notes
+                                    noteLines.forEach(line => {
+                                      Object.keys(recordMap).forEach(key => {
+                                        if (line.includes(`${key}:`)) {
+                                          recordMap[key] = line.split(`${key}:`)[1]?.trim() || 'Not recorded';
+                                        }
+                                      });
+                                    });
+                                    
+                                    // Create items for display
+                                    return Object.entries(recordMap).map(([key, value], idx) => (
+                                      <View key={idx} style={styles.recordItem}>
+                                        <Text style={styles.recordItemLabel}>{key}</Text>
+                                        <Text style={styles.recordItemValue}>{value || 'Not recorded'}</Text>
+                                      </View>
+                                    ));
+                                  })()}
+                                </View>
+                              ) : (
+                                <Text style={styles.noRecordsText}>No medical record details available</Text>
+                              )}
                             </View>
-                          ) : (
-                            <Text style={styles.noRecordsText}>No medical record details available</Text>
-                          )}
-                        </View>
-                      </>
-                    )}
-                  </Surface>
-                ))
+                          </>
+                        )}
+                      </Surface>
+                    ))
+                  }
+                </ScrollView>
+                
+                {pastAppointments.length > 2 && (
+                  <View style={styles.pastAppointmentsIndicator}>
+                    <Text style={styles.scrollIndicatorText}>Scroll to see more ({pastAppointments.length-2} more)</Text>
+                  </View>
+                )}
+              </>
             ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>No appointment history</Text>
               </View>
-            )}
-            
-            {pastAppointments.length > 3 && (
-              <Button 
-                mode="text" 
-                onPress={() => {
-                  // View all history logic would go here
-                  showToast('Full history view coming soon', 'info');
-                }}
-                style={styles.viewAllButton}
-              >
-                View All History
-              </Button>
             )}
           </View>
         </Surface>
@@ -1003,5 +1005,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pastAppointmentsScroll: {
+    maxHeight: 350,
+    marginBottom: 8,
+  },
+  pastAppointmentsIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    backgroundColor: '#f5f5f5', 
+    borderRadius: 20,
+    marginVertical: 4,
+    alignSelf: 'center',
+  },
+  scrollIndicatorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4CAF50',
   },
 });
