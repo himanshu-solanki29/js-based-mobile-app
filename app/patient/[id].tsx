@@ -2,40 +2,27 @@ import { StyleSheet, ScrollView, TouchableOpacity, View, Alert, Platform } from 
 import { Colors } from "@/constants/Colors";
 import { Stack, useLocalSearchParams, router, useRouter } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, Divider, IconButton, List, Text } from "react-native-paper";
+import { Button, Card, Chip, Divider, IconButton, List, Text, Appbar, Surface, Avatar, TouchableRipple } from "react-native-paper";
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { formatDate } from "@/utils/dateFormat";
 import { AppointmentScheduler } from "@/components/AppointmentScheduler";
 import { useGlobalToast } from "@/components/GlobalToastProvider";
 import { requestStoragePermissions, checkStoragePermissions } from '@/app/runtime-permissions';
+import usePatientStorage from '@/utils/usePatientStorage';
 import { 
-  getPatient, 
-  editPatient, 
-  deletePatient, 
-  usePatients
+  getPatientById, 
+  updatePatient, 
+  Patient
 } from "@/utils/patientStore";
 import { 
   getPatientAppointments,
   addAppointment, 
-  Appointment
+  Appointment,
+  AppointmentStatus
 } from '@/utils/appointmentStore';
 import { globalEventEmitter } from '@/app/(tabs)/index';
-
-// Mock appointment data used across the app
-// In a real app this would be in a central store/context
-const MOCK_APPOINTMENTS = [
-  {
-    id: '1',
-    patientId: '1',
-    patientName: 'John Doe',
-    date: '2023-06-15',
-    time: '09:30 AM',
-    reason: 'Follow-up',
-    status: 'confirmed',
-  },
-  // More appointments would be here
-];
 
 // Define types for visits and patient data
 type Visit = {
@@ -46,92 +33,6 @@ type Visit = {
   weight: string;
   prescription: string;
 };
-
-// Note: In a production app, visits would be generated from completed appointments
-
-type Patient = {
-  id: string;
-  name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  email: string;
-  height: string;
-  weight: string;
-  bloodPressure: string;
-  medicalHistory: string;
-  visits: Visit[];
-};
-
-type PatientsData = {
-  [key: string]: Patient;
-};
-
-// Mock data for patient visits and details
-const MOCK_PATIENTS: PatientsData = {
-  "1": {
-    id: "1",
-    name: "John Doe",
-    age: 42,
-    gender: "Male",
-    phone: "555-1234",
-    email: "john.doe@example.com",
-    height: "175 cm",
-    weight: "78 kg",
-    bloodPressure: "120/80",
-    medicalHistory: "Hypertension, Seasonal allergies",
-    visits: [
-      {
-        date: "2023-03-10",
-        complaint: "Persistent cough",
-        diagnosis: "Bronchitis",
-        bloodPressure: "126/82",
-        weight: "78 kg",
-        prescription: "Amoxicillin 500mg, twice daily for 7 days"
-      },
-      {
-        date: "2023-02-15",
-        complaint: "Headache, fatigue",
-        diagnosis: "Migraine",
-        bloodPressure: "130/85",
-        weight: "79 kg",
-        prescription: "Sumatriptan 50mg as needed, Propranolol 40mg daily"
-      }
-    ]
-  },
-  "2": {
-    id: "2",
-    name: "Jane Smith",
-    age: 35,
-    gender: "Female",
-    phone: "555-2345",
-    email: "jane.smith@example.com",
-    height: "165 cm",
-    weight: "62 kg",
-    bloodPressure: "118/75",
-    medicalHistory: "Asthma",
-    visits: [
-      {
-        date: "2023-03-15",
-        complaint: "Shortness of breath",
-        diagnosis: "Asthma exacerbation",
-        bloodPressure: "120/78",
-        weight: "62 kg",
-        prescription: "Albuterol inhaler, Prednisone 40mg daily for 5 days"
-      }
-    ]
-  }
-};
-
-// Add MedicalRecord interface definition directly in the file
-// Define the MedicalRecord interface locally
-interface MedicalRecord {
-  complaint: string;
-  diagnosis: string;
-  bloodPressure: string;
-  weight: string;
-  prescription: string;
-}
 
 // Define status colors for consistent styling
 const STATUS_COLORS = {
@@ -170,21 +71,21 @@ export default function PatientDetailsScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSchedulingAppointment, setIsSchedulingAppointment] = useState(false);
 
-  // Listen for dummy data changes
+  // Listen for data changes
   useEffect(() => {
     // Define the refresh handler
-    const handleDummyDataChange = () => {
-      console.log('PatientDetailsScreen: Refreshing after dummy data change');
+    const handleDataChange = () => {
+      console.log('PatientDetailsScreen: Refreshing after data change');
       // Force a refresh
       setRefreshTrigger(prev => prev + 1);
     };
     
     // Add event listener
-    globalEventEmitter.addListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+    globalEventEmitter.addListener('DATA_CHANGED', handleDataChange);
     
     // Remove event listener on cleanup
     return () => {
-      globalEventEmitter.removeListener('DUMMY_DATA_CHANGED', handleDummyDataChange);
+      globalEventEmitter.removeListener('DATA_CHANGED', handleDataChange);
     };
   }, []);
   
@@ -196,7 +97,7 @@ export default function PatientDetailsScreen() {
         console.log('Loading patient with ID:', id);
         
         // Get the patient
-        const patientData = await getPatient(id);
+        const patientData = await getPatientById(id);
         if (!patientData) {
           console.error('Patient not found:', id);
           showToast('Patient not found', 'error');
@@ -250,29 +151,33 @@ export default function PatientDetailsScreen() {
               "Storage permission is needed to save appointment data.",
               [{ text: "OK" }]
             );
-            setIsSchedulingAppointment(false);
             return;
           }
         }
       }
 
-      const newAppointment = await addAppointment({
+      // Add appointment
+      await addAppointment({
         date: appointmentData.date,
         time: appointmentData.time,
         reason: appointmentData.reason,
-        notes: appointmentData.notes || '',
-        patientId: patient?.id,
+        notes: appointmentData.notes,
+        patientId: patient?.id || '',
         status: 'pending'
       });
 
-      showToast(
-        `Appointment scheduled for ${patient?.name} on ${appointmentData.date.toLocaleDateString()} at ${appointmentData.time}`,
-        'success'
-      );
+      // Update list of appointments
+      const updatedAppointments = await getPatientAppointments(id);
+      setPatientAppointments(updatedAppointments);
+      
+      // Show success toast
+      showToast('Appointment scheduled successfully', 'success');
+      
+      // Hide scheduler
       setIsShowingScheduler(false);
       
-      // Refresh the appointments list
-      setRefreshTrigger(prev => prev + 1);
+      // Notify other components that data has changed
+      globalEventEmitter.emit('DATA_CHANGED');
     } catch (error) {
       console.error('Error scheduling appointment:', error);
       showToast('Failed to schedule appointment', 'error');
