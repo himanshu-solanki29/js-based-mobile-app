@@ -132,6 +132,15 @@ class PatientStorageService extends StorageService<PatientsData> {
   async bulkAddPatients(newPatients: Record<string, Patient>): Promise<void> {
     await this.ensureInitialized();
     
+    // Check for overwriting patients - log it but still allow it
+    const existingIds = Object.keys(this.patients);
+    const newIds = Object.keys(newPatients);
+    const overlappingIds = newIds.filter(id => existingIds.includes(id));
+    
+    if (overlappingIds.length > 0) {
+      console.log(`Overwriting ${overlappingIds.length} existing patients:`, overlappingIds);
+    }
+    
     // Merge new patients with existing patients
     this.patients = {
       ...this.patients,

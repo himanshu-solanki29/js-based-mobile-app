@@ -128,10 +128,18 @@ class AppointmentStorageService extends StorageService<Appointment[]> {
   async bulkAddAppointments(newAppointments: Appointment[]): Promise<void> {
     await this.ensureInitialized();
     
-    // Add all new appointments to the array
+    // Get existing appointment IDs
+    const existingIds = new Set(this.appointments.map(app => app.id));
+    
+    // Filter out appointments that already exist to avoid duplicates
+    const uniqueNewAppointments = newAppointments.filter(app => !existingIds.has(app.id));
+    
+    console.log(`Adding ${uniqueNewAppointments.length} unique appointments out of ${newAppointments.length} provided`);
+    
+    // Add unique new appointments to the array
     this.appointments = [
       ...this.appointments,
-      ...newAppointments
+      ...uniqueNewAppointments
     ];
     
     // Persist to storage
